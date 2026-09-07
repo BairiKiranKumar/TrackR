@@ -1,0 +1,318 @@
+.page {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--page-padding);
+  padding-top: calc(env(safe-area-inset-top, 0) + 20px);
+  padding-bottom: calc(var(--nav-height) + 24px);
+}
+
+.loading {
+  padding: var(--space-8);
+}
+
+/* Greeting */
+.greeting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-8);
+  padding-top: var(--space-4);
+}
+
+.greetingText {
+  font-size: var(--font-size-2xl);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.greetingDate {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.zapIcon {
+  color: var(--accent-secondary);
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
+/* Sections */
+.section {
+  margin-bottom: var(--space-8);
+}
+
+.seeAll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--accent-secondary);
+  text-decoration: none;
+  transition: opacity var(--transition-fast);
+}
+.seeAll:hover { opacity: 0.75; text-decoration: none; }
+
+/* Tasks */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.taskItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.taskItem:last-child {
+  border-bottom: none;
+}
+
+.taskCheck {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: color var(--transition-fast), transform var(--transition-spring);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.taskCheck:active {
+  transform: scale(0.85);
+}
+
+.checkDone {
+  color: var(--color-success);
+}
+
+.checkTodo {
+  color: var(--text-tertiary);
+}
+
+.taskTitle {
+  flex: 1;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.taskTitle:hover {
+  color: var(--accent-secondary);
+  text-decoration: none;
+}
+
+/* Trackers */
+.trackerCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.trackerCard {
+  display: block;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.trackerCard:hover {
+  background: var(--bg-card-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+}
+
+.trackerCard:active {
+  transform: scale(0.98);
+}
+
+.trackerHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.trackerEmoji {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.trackerInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trackerName {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.trackerProgress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.trackerPct {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* Money */
+.moneyCards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.moneyCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.moneyLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.moneyAmount {
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.positive { color: var(--color-success); }
+.negative { color: var(--color-danger); }
+
+/* Notes */
+.noteList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.noteCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.noteCard:hover {
+  background: var(--bg-card-hover);
+  text-decoration: none;
+}
+
+.noteCard:active { transform: scale(0.98); }
+
+.noteEmoji {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.noteInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.noteTitle {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notePreview {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Activity */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.activityItem:last-child {
+  border-bottom: none;
+}
+
+.activityEmoji {
+  font-size: 16px;
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.activityDesc {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activityTime {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
