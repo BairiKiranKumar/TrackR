@@ -1,4 +1,4 @@
-import { Item, ItemRelation, MentionMatch, MoneyDetection } from '@/types';
+import { Item, ItemRelation, MentionMatch } from '@/types';
 
 // ─── @ Reference Parser ────────────────────────────────────────────────────
 

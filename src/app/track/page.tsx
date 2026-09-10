@@ -1,20 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Plus, Target, CheckSquare, Flame, Star, Folder, Circle, CheckCircle2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2, Target, Folder, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { Item, TrackerMetadata, TaskMetadata } from '@/types';
 import { dataService } from '@/lib/services/DataService';
-import { formatAmount } from '@/lib/services/MoneyParser';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import styles from './page.module.css';
 
 type Tab = 'tasks' | 'trackers' | 'goals' | 'projects';
 
-export default function TrackPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('tasks');
+function TrackContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as Tab | null;
+  const [userTab, setUserTab] = useState<Tab | null>(null);
+  const activeTab: Tab = userTab ?? (tabParam && ['tasks', 'trackers', 'goals', 'projects'].includes(tabParam) ? tabParam : 'tasks');
+  const setActiveTab = setUserTab;
   const { items, refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const router = useRouter();
 
   const tasks = items.filter(i => i.type === 'task');
@@ -32,6 +38,24 @@ export default function TrackPage() {
   async function handleCompleteTask(taskId: string) {
     await dataService.completeTask(taskId);
     await refreshItems();
+  }
+
+  async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const confirmed = await confirm({
+      title: `Delete "${title || 'this item'}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await dataService.deleteItem(id);
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+    }
   }
 
   return (
@@ -79,6 +103,7 @@ export default function TrackPage() {
             return (
               <div key={task.id} className={`${styles.taskRow} ${isDone ? styles.taskDone : ''}`}>
                 <button
+                  type="button"
                   className={styles.checkBtn}
                   onClick={() => !isDone && handleCompleteTask(task.id)}
                   id={`btn-complete-${task.id}`}
@@ -96,6 +121,16 @@ export default function TrackPage() {
                   )}
                 </Link>
                 {meta.priority === 'high' && <span className="badge badge-danger">!</span>}
+                <button
+                  type="button"
+                  className="btn btn-icon btn-ghost"
+                  onClick={(e) => handleDeleteItem(e, task.id, task.title)}
+                  id={`btn-delete-task-${task.id}`}
+                  title="Delete task"
+                  style={{ color: 'var(--text-tertiary)', padding: 4, flexShrink: 0 }}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             );
           })}
@@ -107,13 +142,13 @@ export default function TrackPage() {
         <div className={styles.list}>
           {trackers.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state__icon">🎯</span>
+              <span className="empty-state__icon"><Target size={36} /></span>
               <span className="empty-state__title">No trackers yet</span>
               <span className="empty-state__subtitle">Create a series, streak, or habit tracker to stay consistent.</span>
             </div>
           )}
           {trackers.map(tracker => (
-            <TrackerCard key={tracker.id} tracker={tracker} onUpdate={refreshItems} />
+            <TrackerCard key={tracker.id} tracker={tracker} onUpdate={refreshItems} onDelete={(e) => handleDeleteItem(e, tracker.id, tracker.title)} />
           ))}
         </div>
       )}
@@ -123,12 +158,12 @@ export default function TrackPage() {
         <div className={styles.list}>
           {goals.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state__icon">⭐</span>
+              <span className="empty-state__icon"><Star size={36} /></span>
               <span className="empty-state__title">No goals yet</span>
               <span className="empty-state__subtitle">Set targets and track your progress toward them.</span>
             </div>
           )}
-          {goals.map(goal => <GoalCard key={goal.id} goal={goal} />)}
+          {goals.map(goal => <GoalCard key={goal.id} goal={goal} onDelete={(e) => handleDeleteItem(e, goal.id, goal.title)} />)}
         </div>
       )}
 
@@ -137,12 +172,12 @@ export default function TrackPage() {
         <div className={styles.list}>
           {projects.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state__icon">📁</span>
+              <span className="empty-state__icon"><Folder size={36} /></span>
               <span className="empty-state__title">No projects yet</span>
               <span className="empty-state__subtitle">Projects are containers. Use @references to connect notes, tasks, and money to them.</span>
             </div>
           )}
-          {projects.map(project => <ProjectCard key={project.id} project={project} />)}
+          {projects.map(project => <ProjectCard key={project.id} project={project} onDelete={(e) => handleDeleteItem(e, project.id, project.title)} />)}
         </div>
       )}
     </div>
@@ -151,7 +186,9 @@ export default function TrackPage() {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => void }) {
+const DAY_GRID_PAGE_SIZE = 15;
+
+function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate: () => void; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = tracker.metadata as TrackerMetadata;
   const isSeries = meta.trackerType === 'series';
   const isStreak = meta.trackerType === 'streak';
@@ -159,6 +196,15 @@ function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => voi
   const total = meta.totalDays ?? 0;
   const pct = total > 0 ? (completed / total) * 100 : 0;
   const streak = meta.currentStreak ?? 0;
+
+  const dayPageCount = Math.max(1, Math.ceil(total / DAY_GRID_PAGE_SIZE));
+  // Open on whichever page of 15 contains the next day to complete, so a
+  // tracker that's already well underway doesn't dump you back at day 1.
+  const [dayPage, setDayPage] = useState(() =>
+    Math.min(Math.floor(completed / DAY_GRID_PAGE_SIZE), dayPageCount - 1)
+  );
+  const dayPageStart = dayPage * DAY_GRID_PAGE_SIZE;
+  const dayPageEnd = Math.min(dayPageStart + DAY_GRID_PAGE_SIZE, total);
 
   async function handleDayTap(dayIndex: number) {
     const completedDays = meta.completedDays ?? [];
@@ -176,22 +222,36 @@ function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => voi
   }
 
   return (
-    <Link href={`/track/${tracker.id}`} className={styles.trackerCard} id={`link-tracker-${tracker.id}`}>
+    <div className={styles.trackerCard} id={`tracker-card-${tracker.id}`}>
       <div className={styles.trackerHeader}>
-        <span className={styles.trackerEmoji}>{meta.emoji ?? (isStreak ? '🔥' : '🎯')}</span>
-        <div className={styles.trackerMeta}>
-          <span className={styles.trackerName}>{tracker.title}</span>
-          <div className={styles.trackerStats}>
-            {streak > 0 && (
-              <span className="streak-badge">
-                <span className="streak-fire">🔥</span> {streak} day streak
-              </span>
-            )}
-            {isSeries && total > 0 && (
-              <span className={styles.trackerStat}>{completed}/{total} days</span>
-            )}
+        <Link href={`/track/${tracker.id}`} className={styles.trackerMainLink} id={`link-tracker-${tracker.id}`}>
+          <span className={styles.trackerEmoji}>{meta.emoji ?? (isStreak ? '🔥' : '🎯')}</span>
+          <div className={styles.trackerMeta}>
+            <span className={styles.trackerName}>{tracker.title}</span>
+            <div className={styles.trackerStats}>
+              {streak > 0 && (
+                <span className="streak-badge">
+                  <span className="streak-fire">🔥</span> {streak} day streak
+                </span>
+              )}
+              {isSeries && total > 0 && (
+                <span className={styles.trackerStat}>{completed}/{total} days</span>
+              )}
+            </div>
           </div>
-        </div>
+        </Link>
+        {onDelete && (
+          <button
+            type="button"
+            className="btn btn-icon btn-ghost"
+            onClick={onDelete}
+            id={`btn-delete-tracker-${tracker.id}`}
+            title="Delete tracker"
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
 
       {/* Progress bar for series */}
@@ -207,84 +267,154 @@ function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => voi
         </div>
       )}
 
-      {/* Day grid for series (first 10 days) */}
+      {/* Day grid for series, 15 days per page */}
       {isSeries && total > 0 && (
-        <div className="day-grid" onClick={e => e.preventDefault()}>
-          {Array.from({ length: Math.min(total, 15) }, (_, i) => {
-            const isCompleted = (meta.completedDays ?? []).includes(i);
-            const isToday = i === completed; // next day to complete
-            return (
+        <>
+          <div className="day-grid">
+            {Array.from({ length: dayPageEnd - dayPageStart }, (_, idx) => {
+              const i = dayPageStart + idx;
+              const isCompleted = (meta.completedDays ?? []).includes(i);
+              const isToday = i === completed; // next day to complete
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`day-dot ${isCompleted ? 'day-dot--completed' : ''} ${isToday ? 'day-dot--today' : ''}`}
+                  onClick={() => handleDayTap(i)}
+                  style={isCompleted ? { background: meta.color ?? 'var(--accent-primary)', borderColor: meta.color ?? 'var(--accent-primary)' } : {}}
+                  title={`Day ${i + 1}`}
+                  id={`day-dot-${tracker.id}-${i}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {dayPageCount > 1 && (
+            <div className={styles.dayGridNav}>
               <button
-                key={i}
-                className={`day-dot ${isCompleted ? 'day-dot--completed' : ''} ${isToday ? 'day-dot--today' : ''}`}
-                onClick={(e) => { e.preventDefault(); handleDayTap(i); }}
-                style={isCompleted ? { background: meta.color ?? 'var(--accent-primary)', borderColor: meta.color ?? 'var(--accent-primary)' } : {}}
-                title={`Day ${i + 1}`}
-                id={`day-dot-${tracker.id}-${i}`}
+                type="button"
+                className={styles.dayGridNavBtn}
+                onClick={() => setDayPage(p => Math.max(0, p - 1))}
+                disabled={dayPage === 0}
+                aria-label="Previous 15 days"
+                id={`btn-tracker-days-prev-${tracker.id}`}
               >
-                {i + 1}
+                <ChevronLeft size={14} />
               </button>
-            );
-          })}
-          {total > 15 && <span className={styles.moreDays}>+{total - 15}</span>}
-        </div>
+              <span className={styles.dayGridNavLabel}>
+                Days {dayPageStart + 1}–{dayPageEnd} of {total}
+              </span>
+              <button
+                type="button"
+                className={styles.dayGridNavBtn}
+                onClick={() => setDayPage(p => Math.min(dayPageCount - 1, p + 1))}
+                disabled={dayPage === dayPageCount - 1}
+                aria-label="Next 15 days"
+                id={`btn-tracker-days-next-${tracker.id}`}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Today button for streak */}
       {isStreak && (
         <button
+          type="button"
           className={styles.streakTodayBtn}
-          onClick={(e) => { e.preventDefault(); handleStreakTap(); }}
+          onClick={() => handleStreakTap()}
           id={`btn-streak-today-${tracker.id}`}
           style={{ background: (meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]) ? 'var(--color-success)' : meta.color ?? 'var(--accent-primary)' }}
         >
           {(meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]) ? '✅ Done today' : '✓ Mark today'}
         </button>
       )}
-    </Link>
+    </div>
   );
 }
 
-function GoalCard({ goal }: { goal: Item }) {
+function GoalCard({ goal, onDelete }: { goal: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = goal.metadata as { targetAmount?: number; currentAmount?: number; currency?: string; isFinancial?: boolean; target?: number; current?: number };
   const target = meta.targetAmount ?? meta.target ?? 0;
   const current = meta.currentAmount ?? meta.current ?? 0;
   const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
 
   return (
-    <Link href={`/track/${goal.id}`} className={styles.goalCard} id={`link-goal-${goal.id}`}>
+    <div className={styles.goalCard} id={`goal-card-${goal.id}`}>
       <div className={styles.goalHeader}>
-        <Star size={18} color="var(--color-goal)" />
-        <span className={styles.goalName}>{goal.title}</span>
-        <span className={styles.goalPct}>{Math.round(pct)}%</span>
+        <Link href={`/track/${goal.id}`} className={styles.goalLink} id={`link-goal-${goal.id}`}>
+          <Star size={18} color="var(--color-goal)" />
+          <span className={styles.goalName}>{goal.title}</span>
+          <span className={styles.goalPct}>{Math.round(pct)}%</span>
+        </Link>
+        {onDelete && (
+          <button
+            type="button"
+            className="btn btn-icon btn-ghost"
+            onClick={onDelete}
+            id={`btn-delete-goal-${goal.id}`}
+            title="Delete goal"
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
-      <div className="progress-track" style={{ marginTop: 8 }}>
-        <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
-      </div>
-      <div className={styles.goalAmounts}>
-        <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
-        <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
-      </div>
-    </Link>
+      <Link href={`/track/${goal.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+        <div className="progress-track" style={{ marginTop: 8 }}>
+          <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
+        </div>
+        <div className={styles.goalAmounts}>
+          <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
+          <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
+        </div>
+      </Link>
+    </div>
   );
 }
 
-function ProjectCard({ project }: { project: Item }) {
+function ProjectCard({ project, onDelete }: { project: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = project.metadata as { emoji?: string; color?: string; status?: string };
   return (
-    <Link href={`/track/${project.id}`} className={styles.projectCard} id={`link-project-${project.id}`}>
-      <span className={styles.projectEmoji}>{meta.emoji ?? '📁'}</span>
-      <div className={styles.projectInfo}>
-        <span className={styles.projectName}>{project.title}</span>
-        {project.content && (
-          <span className={styles.projectDesc}>{project.content.slice(0, 60)}</span>
+    <div className={styles.projectCard} id={`project-card-${project.id}`}>
+      <Link href={`/track/${project.id}`} className={styles.projectMainLink} id={`link-project-${project.id}`}>
+        <span className={styles.projectEmoji}>{meta.emoji ?? '📁'}</span>
+        <div className={styles.projectInfo}>
+          <span className={styles.projectName}>{project.title}</span>
+          {project.content && (
+            <span className={styles.projectDesc}>{project.content.slice(0, 60)}</span>
+          )}
+        </div>
+        {meta.status && (
+          <span className={`badge ${meta.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
+            {meta.status}
+          </span>
         )}
-      </div>
-      {meta.status && (
-        <span className={`badge ${meta.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
-          {meta.status}
-        </span>
+      </Link>
+      {onDelete && (
+        <button
+          type="button"
+          className="btn btn-icon btn-ghost"
+          onClick={onDelete}
+          id={`btn-delete-project-${project.id}`}
+          title="Delete project"
+          style={{ color: 'var(--text-tertiary)', marginLeft: 8, padding: 4, flexShrink: 0 }}
+        >
+          <Trash2 size={16} />
+        </button>
       )}
-    </Link>
+    </div>
+  );
+}
+
+export default function TrackPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32, color: 'var(--text-tertiary)' }}>Loading…</div>}>
+      <TrackContent />
+    </Suspense>
   );
 }

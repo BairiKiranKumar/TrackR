@@ -15,6 +15,46 @@ function isMasterConfigured(): boolean {
   );
 }
 
+export function syncSessionCookies(rawSession?: unknown) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  try {
+    const projectRef = MASTER_URL.replace('https://', '').split('.')[0];
+    const cookieName = `sb-${projectRef}-auth-token`;
+    const value = rawSession
+      ? (typeof rawSession === 'string' ? rawSession : JSON.stringify(rawSession))
+      : (window.localStorage.getItem(cookieName) || '1');
+    document.cookie = `${cookieName}=${encodeURIComponent(value)}; path=/; max-age=2592000; SameSite=Lax`;
+    document.cookie = `trackr-session=1; path=/; max-age=2592000; SameSite=Lax`;
+  } catch {}
+}
+
+export function clearSessionCookies() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  try {
+    const projectRef = MASTER_URL.replace('https://', '').split('.')[0];
+    const cookieName = `sb-${projectRef}-auth-token`;
+    document.cookie = `${cookieName}=; path=/; max-age=0; SameSite=Lax`;
+    document.cookie = `trackr-session=; path=/; max-age=0; SameSite=Lax`;
+  } catch {}
+}
+
+const cookieStorage = {
+  getItem: (key: string) => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(key);
+  },
+  setItem: (key: string, value: string) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(key, value);
+    syncSessionCookies(value);
+  },
+  removeItem: (key: string) => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(key);
+    clearSessionCookies();
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _masterClient: any = null;
 
@@ -22,7 +62,11 @@ export function getMasterSupabase() {
   if (!isMasterConfigured()) return null;
   if (_masterClient) return _masterClient;
   _masterClient = createClient(MASTER_URL, MASTER_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storage: cookieStorage,
+    },
   });
   return _masterClient;
 }

@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { seedDemoData } from '@/lib/db/seed';
 import { dataService } from '@/lib/services/DataService';
-import { Item, Theme } from '@/types';
+import { DailyStreakState, Item, Theme } from '@/types';
+import { useAuth } from '@/components/providers/AuthProvider';
 
 // ─── Context types ─────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ interface AppContextValue {
   refreshItems: () => Promise<void>;
   isLoading: boolean;
   isReady: boolean;
+  dailyStreak: DailyStreakState | null;
 }
 
 const AppContext = createContext<AppContextValue>({
@@ -23,6 +25,7 @@ const AppContext = createContext<AppContextValue>({
   refreshItems: async () => {},
   isLoading: true,
   isReady: false,
+  dailyStreak: null,
 });
 
 export function useAppContext() {
@@ -32,10 +35,12 @@ export function useAppContext() {
 // ─── Provider ─────────────────────────────────────────────────────────────
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [theme, setTheme] = useState<Theme>('dark');
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState<DailyStreakState | null>(null);
 
   // Initialize DB and seed
   useEffect(() => {
@@ -67,6 +72,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     init();
   }, []);
 
+  useEffect(() => {
+    if (!isReady || !user) return;
+
+    dataService.recordDailyAppOpen().then(setDailyStreak).catch(error => {
+      console.error('TRACKR daily streak error:', error);
+    });
+  }, [isReady, user]);
+
   const refreshItems = useCallback(async () => {
     const allItems = await dataService.getAllItems();
     setItems(allItems);
@@ -80,7 +93,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   return (
-    <AppContext.Provider value={{ theme, toggleTheme, items, refreshItems, isLoading, isReady }}>
+    <AppContext.Provider value={{ theme, toggleTheme, items, refreshItems, isLoading, isReady, dailyStreak }}>
       {children}
     </AppContext.Provider>
   );

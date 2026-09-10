@@ -6,7 +6,6 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import {
   signInWithEmail,
   signUpWithEmail,
-  signInWithGoogle,
   sendPasswordReset,
   isSupabaseConfigured,
   getSession,
@@ -23,20 +22,24 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [checking, setChecking] = useState(true);
 
   const configured = isSupabaseConfigured();
 
-  // If already signed in → redirect to home
+  // If already signed in → redirect to requested page or home
   useEffect(() => {
     getSession().then(s => {
-      if (s) router.replace('/');
-      else setChecking(false);
+      if (s) {
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const dest = params?.get('redirect') || '/';
+        router.replace(dest);
+      } else {
+        setChecking(false);
+      }
     });
-  }, []);
+  }, [router]);
 
   function clearMessages() {
     setError('');
@@ -89,18 +92,6 @@ export default function AuthPage() {
       setError(friendlyError(msg));
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleGoogle() {
-    clearMessages();
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-      // Browser will redirect to /auth/callback
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Google sign-in failed.');
-      setGoogleLoading(false);
     }
   }
 
@@ -160,7 +151,7 @@ export default function AuthPage() {
               </button>
               <h2 className={styles.forgotTitle}>Reset Password</h2>
               <p className={styles.forgotSub}>
-                Enter your email and we'll send you a reset link.
+                Enter your email and we&apos;ll send you a reset link.
               </p>
             </div>
           )}
@@ -280,32 +271,6 @@ export default function AuthPage() {
               )}
             </button>
           </form>
-
-          {/* Divider */}
-          {mode !== 'forgot' && (
-            <>
-              <div className={styles.divider}>
-                <span className={styles.dividerLine} />
-                <span className={styles.dividerText}>or</span>
-                <span className={styles.dividerLine} />
-              </div>
-
-              {/* Google OAuth */}
-              <button
-                id="btn-auth-google"
-                className={styles.googleBtn}
-                onClick={handleGoogle}
-                disabled={googleLoading || !configured}
-              >
-                {googleLoading ? (
-                  <Loader2 size={18} className={styles.spinner} />
-                ) : (
-                  <GoogleIcon />
-                )}
-                {googleLoading ? 'Redirecting…' : `Continue with Google`}
-              </button>
-            </>
-          )}
         </div>
 
         {/* Terms */}
@@ -316,19 +281,6 @@ export default function AuthPage() {
         </p>
       </div>
     </div>
-  );
-}
-
-// ─── Google Icon SVG ─────────────────────────────────────────────────────────
-
-function GoogleIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-      <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/>
-      <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/>
-      <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/>
-      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335"/>
-    </svg>
   );
 }
 

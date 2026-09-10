@@ -44,6 +44,9 @@ export type IncomeCategory =
 export interface NoteMetadata {
   pinned?: boolean;
   wordCount?: number;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -52,6 +55,29 @@ export interface TaskMetadata {
   dueDate?: string;
   priority?: 'low' | 'medium' | 'high';
   completedAt?: string;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
+  [key: string]: unknown;
+}
+
+export interface JournalMetadata {
+  mood?: 'great' | 'good' | 'okay' | 'down' | 'stressed';
+  date?: string;
+  weather?: string;
+  location?: string;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
+  [key: string]: unknown;
+}
+
+export interface InboxMetadata {
+  inbox?: boolean;
+  processed?: boolean;
+  capturedVia?: 'quick_add' | 'shortcut' | 'manual';
+  originalInput?: string;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -68,6 +94,7 @@ export interface TrackerMetadata {
   emoji?: string;
   color?: string;           // accent color hex
   startDate?: string;       // ISO date
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -88,6 +115,9 @@ export interface TransactionMetadata {
   account?: string;
   date: string;             // ISO date
   isIncome: boolean;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -101,12 +131,25 @@ export interface BudgetMetadata {
   [key: string]: unknown;
 }
 
+/** Consecutive local calendar days on which the signed-in user opened TRACKR. */
+export interface DailyStreakState {
+  openedDates: string[];
+  currentStreak: number;
+  longestStreak: number;
+  lastOpenedDate: string;
+  endedStreak?: number;
+  endedOn?: string;
+  milestoneReached?: 7 | 30 | 100;
+  milestoneReachedOn?: string;
+}
+
 export interface GoalMetadata {
   targetAmount: number;
   currentAmount: number;
   currency: string;
   deadline?: string;
   isFinancial: boolean;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -114,12 +157,16 @@ export interface ProjectMetadata {
   emoji?: string;
   color?: string;
   status?: 'active' | 'completed' | 'paused';
+  targetDate?: string;
+  description?: string;
   [key: string]: unknown;
 }
 
 export type ItemMetadata =
   | NoteMetadata
   | TaskMetadata
+  | JournalMetadata
+  | InboxMetadata
   | TrackerMetadata
   | TrackerDayMetadata
   | TransactionMetadata
@@ -127,6 +174,85 @@ export type ItemMetadata =
   | GoalMetadata
   | ProjectMetadata
   | Record<string, unknown>;
+
+// ─── Sync Queue ────────────────────────────────────────────────────────────
+
+export type SyncOperationType =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'upsert'
+  | 'clear'
+  | 'relation_create'
+  | 'relation_delete'
+  | 'clear_all';
+
+export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'failed' | 'synced' | 'offline' | 'needs_attention';
+
+export interface SyncOperation {
+  id: string;
+  entityType: 'item' | 'item_relation' | 'database';
+  entityId: string;
+  operation: SyncOperationType;
+  payload?: unknown;
+  createdAt: string;
+  retryCount: number;
+  lastAttemptAt?: string;
+  lastError?: string;
+  status: SyncStatus;
+}
+
+// ─── Capability & Extension Interfaces ─────────────────────────────────────
+
+export interface CaptureResult {
+  title: string;
+  type: ItemType;
+  content?: string;
+  projectId?: string;
+  tags: string[];
+  inbox: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CaptureProcessor {
+  process(rawInput: string, allProjects?: Item[]): Promise<CaptureResult>;
+}
+
+export interface MoneyDetectionResult {
+  amount: number;
+  currency: string;
+  rawText: string;
+  startIndex?: number;
+  endIndex?: number;
+}
+
+export interface MoneyDetector {
+  detect(text: string): MoneyDetectionResult[];
+}
+
+export interface AIProvider {
+  classifyCapture(input: string): Promise<{ type: ItemType; tags: string[] }>;
+  suggestRelations(item: Item, existingItems: Item[]): Promise<{ targetId: string; reason: string }[]>;
+  summarize(items: Item[]): Promise<string>;
+  semanticSearch(query: string, items: Item[]): Promise<Item[]>;
+}
+
+// ─── Project Context Aggregation ───────────────────────────────────────────
+
+export interface ProjectContextSummary {
+  project: Item;
+  tasks: Item[];
+  openTasksCount: number;
+  completedTasksCount: number;
+  notes: Item[];
+  trackers: Item[];
+  expenses: Item[];
+  totalExpenses: number;
+  goals: Item[];
+  linkedItems: Item[];
+  recentActivity: ActivityEvent[];
+  relations: ItemRelation[];
+}
 
 // ─── Core Item ─────────────────────────────────────────────────────────────
 
@@ -145,7 +271,7 @@ export interface Item {
 
 // ─── Relations ─────────────────────────────────────────────────────────────
 
-export type RelationType = 'references' | 'contains' | 'linked';
+export type RelationType = 'references' | 'contains' | 'linked' | 'parent' | 'child';
 
 export interface ItemRelation {
   id: string;
@@ -221,6 +347,24 @@ export interface QuickAddState {
   defaultType?: ItemType;
 }
 
+export interface InAppNotification {
+  id: string;
+  kind: 'overdue_task' | 'streak_milestone' | 'budget_alert';
+  title: string;
+  description: string;
+  href?: string;
+}
+
+export interface WeeklyDigestSummary {
+  weekEnding: string;
+  tasksCompleted: number;
+  notesWritten: number;
+  streakDays: number;
+  income: number;
+  expenses: number;
+  topReferencedItem?: { title: string; references: number };
+}
+
 export type Theme = 'dark' | 'light';
 
 // ─── Supabase sync ─────────────────────────────────────────────────────────
@@ -230,11 +374,18 @@ export interface SupabaseConfig {
   anonKey: string;
 }
 
-export interface SyncStatus {
+export interface SupabaseSyncState {
   connected: boolean;
   lastSyncedAt?: string;
   error?: string;
 }
+
+// ─── Storage mode ──────────────────────────────────────────────────────────
+// Where a signed-in user's data syncs to. New users default to 'trackr_cloud'
+// automatically — no setup step. 'custom_supabase' (BYODB) is an advanced,
+// explicitly-opted-into setting managed from Settings → Data & Storage.
+
+export type StorageMode = 'trackr_cloud' | 'custom_supabase';
 
 // ─── Helper / derived types ────────────────────────────────────────────────
 
@@ -242,8 +393,16 @@ export type TrackerItem = Item & { metadata: TrackerMetadata };
 export type TaskItem = Item & { metadata: TaskMetadata };
 export type NoteItem = Item & { metadata: NoteMetadata };
 export type TransactionItem = Item & { metadata: TransactionMetadata };
+export type BudgetItem = Item & { metadata: BudgetMetadata };
 export type ProjectItem = Item & { metadata: ProjectMetadata };
 export type GoalItem = Item & { metadata: GoalMetadata };
+
+export interface BudgetProgress {
+  budget: BudgetItem;
+  spent: number;
+  percentage: number;
+  isAlert: boolean;
+}
 
 export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   note: 'Note',

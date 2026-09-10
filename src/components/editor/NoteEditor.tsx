@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Bold, Italic, Hash, AtSign, Check, IndianRupee, ArrowLeft, MoreVertical, Type } from 'lucide-react';
+import { Bold, Italic, Hash, AtSign, Check, IndianRupee, ArrowLeft, MoreVertical, Type, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { dataService } from '@/lib/services/DataService';
 import { Item } from '@/types';
 import { AtMention } from './AtMention';
 import { MoneyDetector } from './MoneyDetector';
-import { detectMoneyAmounts } from '@/lib/services/MoneyParser';
+import { moneyDetectionService } from '@/lib/services/MoneyDetectionService';
 import styles from './NoteEditor.module.css';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { format } from 'date-fns';
 
 interface NoteEditorProps {
@@ -20,6 +21,7 @@ interface NoteEditorProps {
 export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   const router = useRouter();
   const { items, refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -27,7 +29,6 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   const [title, setTitle] = useState(item.title || '');
   const [content, setContent] = useState(item.content || '');
   const [saved, setSaved] = useState(true);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // @ mention state
   const [atQuery, setAtQuery] = useState('');
@@ -59,7 +60,6 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
           if (onSaved) onSaved(updated);
         }
         setSaved(true);
-        setLastSaved(new Date());
       } catch (err) {
         console.error('Save error:', err);
       }
@@ -73,7 +73,7 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
     autoSave(title, text);
 
     // Detect money amounts
-    const detections = detectMoneyAmounts(text);
+    const detections = moneyDetectionService.detect(text);
     setMoneyDetections(detections.slice(0, 1)); // show top 1 suggestion
 
     // Detect @ trigger
@@ -183,10 +183,10 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   }
 
   async function handleMoneyAccept(amount: number) {
-    await dataService.createItem({
+    const expense = await dataService.createItem({
       type: 'expense',
-      title: `₹${amount} expense`,
-      content: content.slice(0, 100),
+      title: `₹${amount.toLocaleString('en-IN')} expense`,
+      content: `Expense noted from "${title || 'Note'}"`,
       metadata: {
         amount,
         currency: 'INR',
@@ -195,6 +195,7 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
         date: new Date().toISOString().split('T')[0],
       },
     });
+    await dataService.linkItems(item.id, expense.id, 'references');
     await refreshItems();
     setMoneyDetections([]);
   }
@@ -206,6 +207,23 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   }
 
   const formattedDate = format(new Date(item.createdAt), 'MMMM d, yyyy');
+
+  async function handleDeleteNote() {
+    const confirmed = await confirm({
+      title: `Delete "${title || 'Untitled'}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await dataService.deleteItem(item.id);
+      await refreshItems();
+      router.push('/notes');
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  }
 
   return (
     <div className={styles.container}>
@@ -228,9 +246,21 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
             <span className={styles.saving}>Saving…</span>
           )}
         </div>
-        <button className="btn btn-icon btn-ghost" id="btn-note-more" aria-label="More options">
-          <MoreVertical size={20} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            className="btn btn-icon btn-ghost"
+            onClick={handleDeleteNote}
+            id="btn-note-delete"
+            aria-label="Delete note"
+            title="Delete note"
+            style={{ color: 'var(--color-danger)' }}
+          >
+            <Trash2 size={18} />
+          </button>
+          <button className="btn btn-icon btn-ghost" id="btn-note-more" aria-label="More options">
+            <MoreVertical size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Editor area */}

@@ -10,6 +10,7 @@ import {
   USER_DB_SCHEMA_SQL,
 } from '@/lib/services/UserConfigService';
 import { initUserSupabase } from '@/lib/supabase';
+import { storageModeService } from '@/lib/services/StorageModeService';
 import styles from './page.module.css';
 
 type Step = 'connect' | 'schema' | 'done';
@@ -71,6 +72,10 @@ export default function SetupPage() {
         display_name: user.email?.split('@')[0],
       });
       initUserSupabase(url.trim(), anonKey.trim());
+      // Completing this wizard IS the explicit opt-in — only now does the
+      // app actually start routing new writes to this project.
+      storageModeService.setCustomConfigured(true);
+      await storageModeService.setMode('custom_supabase');
       await refreshUserConfig();
       setStep('done');
     } catch (err) {
@@ -87,6 +92,15 @@ export default function SetupPage() {
   return (
     <div className={styles.page}>
       <div className={styles.content}>
+        <button
+          className={styles.secondaryBtn}
+          onClick={() => router.push('/settings')}
+          id="btn-setup-back-to-settings"
+          style={{ alignSelf: 'flex-start', marginBottom: 8 }}
+        >
+          ← Back to Settings
+        </button>
+
         {/* Logo */}
         <div className={styles.logo}>T</div>
 
@@ -114,9 +128,11 @@ export default function SetupPage() {
             <div className={styles.cardHeader}>
               <Database size={22} className={styles.cardIcon} />
               <div>
-                <h1 className={styles.cardTitle}>Connect your Supabase</h1>
+                <h1 className={styles.cardTitle}>Connect your own Supabase</h1>
                 <p className={styles.cardSub}>
-                  This is your personal database where all your TRACKR data will live. You only set this up once.
+                  Advanced option. By default TRACKR stores your data in TRACKR Cloud — you don&apos;t need this
+                  page. Connect your own Supabase project only if you want to control where your data lives
+                  yourself. Make sure the required TRACKR schema and security policies are installed first.
                 </p>
               </div>
             </div>

@@ -15,14 +15,16 @@ interface AtMentionProps {
 
 export function AtMention({ query, items, position, onSelect, onClose }: AtMentionProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [prevQuery, setPrevQuery] = useState(query);
   const listRef = useRef<HTMLDivElement>(null);
 
   const suggestions = getAtMentionSuggestions(query, items);
 
   // Reset selection when suggestions change
-  useEffect(() => {
+  if (prevQuery !== query) {
+    setPrevQuery(query);
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   // Keyboard navigation
   useEffect(() => {

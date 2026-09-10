@@ -3,9 +3,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { getSession, signOut, isSupabaseConfigured } from '@/lib/auth/AuthService';
-import { getMasterSupabase, initUserSupabase, clearUserSupabase } from '@/lib/supabase';
+import { getMasterSupabase, initUserSupabase, clearUserSupabase, syncSessionCookies, clearSessionCookies } from '@/lib/supabase';
 import { getUserConfig, type UserConfig } from '@/lib/services/UserConfigService';
 import { dataService } from '@/lib/services/DataService';
+import { storageModeService } from '@/lib/services/StorageModeService';
 import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextValue {
@@ -40,8 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const configured = isSupabaseConfigured();
+  const [isLoading, setIsLoading] = useState(configured);
 
   // The auth-state-change subscription below is wired up once on mount, so
   // `handleAuthState` must not close over a stale `pathname` from that first
@@ -55,14 +56,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const loadUserConfig = useCallback(async (userId: string): Promise<UserConfig | null> => {
+    storageModeService.setActiveUser(userId);
     try {
       const config = await getUserConfig(userId);
+      storageModeService.setCustomConfigured(!!config);
       if (config) {
         setUserConfig(config);
         initUserSupabase(config.supabase_url, config.supabase_anon_key);
-        // Pull data from Supabase → IndexedDB (background, non-blocking)
-        dataService.pullFromSupabase().catch(() => {});
+      } else {
+        setUserConfig(null);
       }
+      // Pull from whichever provider is active — TRACKR Cloud by default,
+      // or the user's own Supabase project for BYODB — into IndexedDB
+      // (background, non-blocking; no configuration is required for this).
+      dataService.pullFromSupabase().catch(() => {});
       return config ?? null;
     } catch {
       return null;
@@ -85,17 +92,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentPath = pathnameRef.current;
 
     if (newUser) {
-      const config = await loadUserConfig(newUser.id);
+      syncSessionCookies(newSession);
+      await loadUserConfig(newUser.id);
       const isOnAuth = currentPath.startsWith('/auth');
 
+      // No database setup step — a signed-in user is immediately usable via
+      // TRACKR Cloud. /auth/setup is reached only from Settings → Data &
+      // Storage → Advanced now, as an explicit opt-in, never a forced gate.
       if (isOnAuth) {
-        if (config) router.replace('/');
-        else router.replace('/auth/setup');
-      } else if (!config && !currentPath.startsWith('/auth')) {
-        router.replace('/auth/setup');
+        const redirectUrl = typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('redirect') || '/'
+          : '/';
+        router.replace(redirectUrl);
       }
     } else {
+      clearSessionCookies();
       clearUserSupabase();
+      storageModeService.setActiveUser(null);
+      storageModeService.setCustomConfigured(false);
       setUserConfig(null);
       // Only redirect if on a protected route
       const protectedPrefixes = ['/notes', '/track', '/money', '/search', '/settings', '/auth/setup'];
@@ -107,8 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadUserConfig, router]);
 
   useEffect(() => {
+    syncSessionCookies();
     if (!configured) {
-      setIsLoading(false);
       return;
     }
 
@@ -131,6 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSignOut = useCallback(async () => {
     await signOut();
     clearUserSupabase();
+    storageModeService.setActiveUser(null);
+    storageModeService.setCustomConfigured(false);
     setUser(null);
     setSession(null);
     setUserConfig(null);

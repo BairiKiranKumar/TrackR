@@ -31,13 +31,14 @@ export function proxy(request: NextRequest) {
   const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
   const cookieName = `sb-${projectRef}-auth-token`;
 
-  // Check both the main cookie and chunk cookies (sb-xxx-auth-token.0, .1, etc.)
+  // Check both the main cookie, chunk cookies, and trackr-session
   const cookies = request.cookies;
   const hasSession =
     !!cookies.get(cookieName) ||
     !!cookies.get(`${cookieName}.0`) ||
-    // Also check for older Supabase cookie format
-    [...cookies.getAll()].some(c => c.name.includes('auth-token') && c.name.includes(projectRef));
+    !!cookies.get('trackr-session') ||
+    !!cookies.get('sb-auth-token') ||
+    [...cookies.getAll()].some(c => c.name.includes('auth-token') || (projectRef && c.name.includes(projectRef)));
 
   const isProtected = PROTECTED_PREFIXES.some(p => pathname.startsWith(p));
   const isAuthRoute = AUTH_ONLY_ROUTES.some(p => pathname.startsWith(p));
@@ -46,6 +47,7 @@ export function proxy(request: NextRequest) {
   if (isProtected && !hasSession) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth';
+    url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 

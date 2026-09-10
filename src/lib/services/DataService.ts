@@ -1,12 +1,21 @@
 import {
   getAllItems, getItemById, getItemsByType, saveItem,
   archiveItem as localArchiveItem, getRelationsForSource, getRelationsForTarget,
-  saveRelation, deleteRelationsForSource, getRecentActivity,
-  saveActivityEvent, searchItems, getSetting, setSetting,
+  saveRelation, getRecentActivity,
+  saveActivityEvent, searchItems, getSetting, setSetting, getAllRelations,
+  deleteItem as localDeleteItem, deleteRelationsForItem, clearAllData as localClearAllData,
+  deleteRelation, deleteRelationByPair, getAllActivityEvents
 } from '@/lib/db/localDb';
-import { parseReferences, buildRelationsFromText } from './ReferenceParser';
-import { Item, ItemType, ItemRelation, ActivityEvent, ActivityEventType } from '@/types';
-import { getUserSupabase } from '@/lib/supabase';
+import { buildRelationsFromText } from './ReferenceParser';
+import {
+  BudgetItem, BudgetMetadata, BudgetProgress, DailyStreakState, Item, ItemType,
+  ItemRelation, ActivityEvent, ActivityEventType, TransactionCategory,
+  TransactionMetadata, WeeklyDigestSummary, ProjectContextSummary,
+  InboxMetadata, SyncStatus, RelationType
+} from '@/types';
+import { syncQueueService } from './SyncQueueService';
+import { storageModeService } from './StorageModeService';
+import { createSampleProjectDataset } from '@/lib/db/demoData';
 
 // ─── ID generation ─────────────────────────────────────────────────────────
 function genId(): string {
@@ -14,176 +23,141 @@ function genId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// ─── Supabase transform helpers ─────────────────────────────────────────────
-// IndexedDB uses camelCase; Supabase tables use snake_case
-
-function toSbRow(item: Item): Record<string, unknown> {
-  return {
-    id: item.id,
-    type: item.type,
-    title: item.title,
-    content: item.content ?? '',
-    metadata: item.metadata ?? {},
-    tags: item.tags ?? [],
-    pinned: item.pinned ?? false,
-    archived: item.archived ?? false,
-    created_at: item.createdAt,
-    updated_at: item.updatedAt,
-  };
+function getLocalDateKey(date = new Date()): string {
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 10);
 }
 
-function fromSbRow(row: Record<string, unknown>): Item {
-  return {
-    id: row.id as string,
-    type: row.type as ItemType,
-    title: row.title as string,
-    content: (row.content as string) ?? '',
-    metadata: (row.metadata as Record<string, unknown>) ?? {},
-    tags: (row.tags as string[]) ?? [],
-    pinned: (row.pinned as boolean) ?? false,
-    archived: (row.archived as boolean) ?? false,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
+function getPreviousDateKey(dateKey: string): string {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() - 1);
+  return getLocalDateKey(date);
 }
 
-// ─── Supabase sync helpers (fire-and-forget) ────────────────────────────────
-
-async function syncItemToSb(item: Item): Promise<void> {
-  const sb = getUserSupabase();
-  if (!sb) return;
-  try {
-    await sb.from('items').upsert(toSbRow(item), { onConflict: 'id' });
-  } catch {
-    // Swallow — local data is source of truth, Supabase is async backup
-  }
-}
-
-async function syncArchiveToSb(id: string): Promise<void> {
-  const sb = getUserSupabase();
-  if (!sb) return;
-  try {
-    await sb.from('items').update({ archived: true, updated_at: new Date().toISOString() }).eq('id', id);
-  } catch { /* swallow */ }
-}
-
-async function syncRelationToSb(rel: ItemRelation): Promise<void> {
-  const sb = getUserSupabase();
-  if (!sb) return;
-  try {
-    await sb.from('item_relations').upsert({
-      id: rel.id,
-      source_id: rel.sourceId,
-      target_id: rel.targetId,
-      relation_type: rel.relationType,
-      created_at: rel.createdAt,
-    }, { onConflict: 'id' });
-  } catch { /* swallow */ }
-}
-
-async function syncDeleteRelationsToSb(sourceId: string): Promise<void> {
-  const sb = getUserSupabase();
-  if (!sb) return;
-  try {
-    await sb.from('item_relations').delete().eq('source_id', sourceId);
-  } catch { /* swallow */ }
-}
-
-async function syncActivityToSb(event: ActivityEvent): Promise<void> {
-  const sb = getUserSupabase();
-  if (!sb) return;
-  try {
-    await sb.from('activity_events').upsert({
-      id: event.id,
-      item_id: event.itemId,
-      item_title: event.itemTitle,
-      type: event.type,
-      description: event.description,
-      metadata: { amount: event.amount, itemType: event.itemType },
-      created_at: event.createdAt,
-    }, { onConflict: 'id' });
-  } catch { /* swallow */ }
-}
-
-// ─── Sync status ─────────────────────────────────────────────────────────────
-
-type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
-type SyncListener = (status: SyncStatus) => void;
-const syncListeners: SyncListener[] = [];
-let currentSyncStatus: SyncStatus = 'idle';
-
-function setSyncStatus(status: SyncStatus) {
-  currentSyncStatus = status;
-  syncListeners.forEach(fn => fn(status));
-}
+export type SyncStateInfo = {
+  status: SyncStatus;
+  pendingCount: number;
+  failedCount: number;
+  attentionCount: number;
+};
+export type SyncListener = (statusOrState: SyncStatus | SyncStateInfo) => void;
 
 // ─── DataService singleton ─────────────────────────────────────────────────
 
 class DataService {
 
   /** Subscribe to sync status changes */
-  onSyncStatusChange(fn: SyncListener): () => void {
-    syncListeners.push(fn);
-    fn(currentSyncStatus);
-    return () => {
-      const idx = syncListeners.indexOf(fn);
-      if (idx >= 0) syncListeners.splice(idx, 1);
-    };
+  onSyncStatusChange(fn: (status: SyncStatus, state?: SyncStateInfo) => void): () => void {
+    return syncQueueService.subscribe(state => {
+      fn(state.status, state);
+    });
   }
 
-  // ── Pull from Supabase on login ──────────────────────────────────────────
-  // Called by AuthProvider after user config is loaded.
-  // Downloads all items from Supabase and saves them to local IndexedDB.
+  // ── Sync issue inspection / recovery ─────────────────────────────────────
+  // Operations that gave up retrying automatically (see SyncQueueService's
+  // MAX_RETRIES) end up here. Nothing is ever silently discarded — the user
+  // can retry or explicitly dismiss, and the underlying local data is
+  // unaffected either way.
+
+  async getSyncOpsNeedingAttention() {
+    return syncQueueService.getOpsNeedingAttention();
+  }
+
+  async retrySyncOp(id: string): Promise<void> {
+    return syncQueueService.retryOp(id);
+  }
+
+  async dismissSyncOp(id: string): Promise<void> {
+    return syncQueueService.discardOp(id);
+  }
+
+  // ── Pull from remote on login ─────────────────────────────────────────────
+  // Called by AuthProvider once it knows which storage destination applies
+  // (TRACKR Cloud by default, or the user's own Supabase for BYODB).
+  // Downloads that provider's items and merges them into local IndexedDB.
 
   async pullFromSupabase(): Promise<void> {
-    const sb = getUserSupabase();
-    if (!sb) return;
+    const provider = await storageModeService.getActiveProvider();
+    if (!provider) return;
 
-    setSyncStatus('syncing');
     try {
-      const { data: rows, error } = await sb
-        .from('items')
-        .select('*')
-        .eq('archived', false)
-        .order('updated_at', { ascending: false });
-
-      if (error || !rows) {
-        setSyncStatus('offline');
-        return;
-      }
-
+      const remoteItems = await provider.pullItems();
       // Merge remote → local (remote wins for newer records)
-      for (const row of rows) {
-        const remoteItem = fromSbRow(row as Record<string, unknown>);
+      for (const remoteItem of remoteItems) {
         const localItem = await getItemById(remoteItem.id);
         if (!localItem || remoteItem.updatedAt > localItem.updatedAt) {
           await saveItem(remoteItem);
         }
       }
-
-      setSyncStatus('synced');
     } catch {
-      setSyncStatus('offline');
+      // Handled via syncQueue retry/status
     }
   }
 
-  // ── Push local → Supabase (initial sync for existing local data) ─────────
+  // ── Push local → remote (initial sync for existing local data) ───────────
 
   async pushLocalToSupabase(): Promise<void> {
-    const sb = getUserSupabase();
-    if (!sb) return;
+    const provider = await storageModeService.getActiveProvider();
+    if (!provider) return;
     const items = await getAllItems();
     if (!items.length) return;
 
-    setSyncStatus('syncing');
-    try {
-      const rows = items.map(toSbRow);
-      // Batch upsert (Supabase supports arrays)
-      await sb.from('items').upsert(rows, { onConflict: 'id' });
-      setSyncStatus('synced');
-    } catch {
-      setSyncStatus('offline');
+    // Routed through the sync queue (not a direct bulk upsert) so failures
+    // retry individually and survive a reload, same as every other write.
+    for (const item of items) {
+      await syncQueueService.enqueue('item', item.id, 'upsert', item);
     }
+  }
+
+  // ── Storage migration (§10/§12: switching between TRACKR Cloud and BYODB) ─
+  // Re-enqueues every local item and relation for upload to whichever
+  // provider is active *right now* — call this immediately after switching
+  // storage mode, when the user explicitly asked to move their existing
+  // data rather than just redirect future writes.
+
+  async migrateAllLocalDataToActiveProvider(): Promise<{ itemsCount: number; relationsCount: number }> {
+    const [items, relations] = await Promise.all([getAllItems(), getAllRelations()]);
+    for (const item of items) {
+      await syncQueueService.enqueue('item', item.id, 'upsert', item);
+    }
+    for (const rel of relations) {
+      await syncQueueService.enqueue('item_relation', rel.id, 'upsert', rel);
+    }
+    return { itemsCount: items.length, relationsCount: relations.length };
+  }
+
+  // ── Account deletion (§13) ────────────────────────────────────────────────
+  // Sequence: (1) caller verifies the user (confirmation UI) before calling
+  // this — not this method's job; (2) wipe this account's rows from whatever
+  // remote provider is currently active; (3) wipe local IndexedDB, which
+  // removes items, relations (so no orphaned relationships survive) and the
+  // sync queue together. Invalidating the session (step 4 of the product
+  // spec) is deliberately left to the caller — Settings calls AuthService's
+  // signOut() right after this resolves — so this method stays testable
+  // without pulling auth into DataService.
+  //
+  // NOT wired to a UI button yet: this has only been verified against a
+  // fake provider in tests, not a real TRACKR Cloud project (no live
+  // managed database exists to test against in this environment). See the
+  // audit report's Known Limitations before exposing this destructively.
+
+  async deleteAccountData(): Promise<{ remoteCleared: boolean; localCleared: boolean; error?: string }> {
+    let remoteCleared = false;
+    let error: string | undefined;
+    try {
+      const provider = await storageModeService.getActiveProvider();
+      if (provider) {
+        await provider.clearAll();
+        remoteCleared = true;
+      } else {
+        remoteCleared = true; // nothing remote to clear (local-only / offline account)
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to clear remote account data.';
+    }
+
+    await localClearAllData();
+    return { remoteCleared, localCleared: true, error };
   }
 
   // ── Items ──────────────────────────────────────────────────────────────
@@ -223,8 +197,8 @@ class DataService {
       await this.updateReferencesFromContent(item.id, item.content);
     }
 
-    // 3. Sync to Supabase (async, non-blocking)
-    syncItemToSb(item);
+    // 3. Persistent sync queue
+    await syncQueueService.enqueue('item', item.id, 'upsert', item);
 
     return item;
   }
@@ -247,29 +221,60 @@ class DataService {
       await this.updateReferencesFromContent(id, updates.content ?? '');
     }
 
-    // Sync to Supabase (async)
-    syncItemToSb(updated);
+    // Persistent sync queue
+    await syncQueueService.enqueue('item', updated.id, 'upsert', updated);
 
     return updated;
   }
 
   async archiveItem(id: string): Promise<void> {
     await localArchiveItem(id);
-    syncArchiveToSb(id);
+    // Send the full item, not a partial fragment — the sync payload is upserted
+    // wholesale to Supabase, so a `{ archived: true }` fragment would overwrite
+    // the remote row with blank/undefined fields.
+    const item = await getItemById(id);
+    if (item) await syncQueueService.enqueue('item', id, 'upsert', item);
   }
 
-  // ── References ─────────────────────────────────────────────────────────
+  async deleteItem(id: string): Promise<void> {
+    await localDeleteItem(id);
+    try {
+      await deleteRelationsForItem(id);
+    } catch (err) {
+      console.warn('Failed to delete relations for item:', err);
+    }
+    try {
+      await syncQueueService.enqueue('item', id, 'delete');
+    } catch (err) {
+      console.warn('Failed to enqueue delete sync op:', err);
+    }
+  }
+
+  async clearAllData(): Promise<void> {
+    await localClearAllData();
+    await syncQueueService.enqueue('database', 'all', 'clear_all');
+  }
+
+  // ── References & Bidirectional Linking ─────────────────────────────────
 
   async updateReferencesFromContent(sourceId: string, content: string): Promise<void> {
     const allItems = await getAllItems();
     const relations = buildRelationsFromText(sourceId, content, allItems);
 
-    await deleteRelationsForSource(sourceId);
-    syncDeleteRelationsToSb(sourceId);
+    // Only replace auto-detected @mention ("references") relations here.
+    // Manually created links (explicit "Link item", project assignment, etc.)
+    // use other relation types and must survive unrelated content edits —
+    // wiping ALL outgoing relations on every content save was destroying them.
+    const existingAutoRefs = (await getRelationsForSource(sourceId))
+      .filter(r => r.relationType === 'references');
+    for (const rel of existingAutoRefs) {
+      await deleteRelation(rel.id);
+      await syncQueueService.enqueue('item_relation', rel.id, 'delete');
+    }
 
     for (const rel of relations) {
       await saveRelation(rel);
-      syncRelationToSb(rel);
+      await syncQueueService.enqueue('item_relation', rel.id, 'upsert', rel);
     }
   }
 
@@ -294,15 +299,252 @@ class DataService {
   }
 
   async addManualRelation(sourceId: string, targetId: string): Promise<void> {
+    await this.linkItems(sourceId, targetId, 'linked');
+  }
+
+  async linkItems(sourceId: string, targetId: string, relationType: RelationType = 'linked'): Promise<ItemRelation> {
     const rel: ItemRelation = {
       id: genId(),
       sourceId,
       targetId,
-      relationType: 'linked',
+      relationType,
       createdAt: new Date().toISOString(),
     };
     await saveRelation(rel);
-    syncRelationToSb(rel);
+    await syncQueueService.enqueue('item_relation', rel.id, 'upsert', rel);
+    return rel;
+  }
+
+  async unlinkItems(sourceId: string, targetId: string): Promise<void> {
+    // Look up the real relation ids in both directions first — the sync queue
+    // deletes remote rows by id, and a fabricated composite key never matches
+    // a real row, so it must be enqueued per actual relation.
+    const [forward, backward] = await Promise.all([
+      getRelationsForSource(sourceId),
+      getRelationsForSource(targetId),
+    ]);
+    const toRemove = [
+      ...forward.filter(r => r.targetId === targetId),
+      ...backward.filter(r => r.targetId === sourceId),
+    ];
+
+    await deleteRelationByPair(sourceId, targetId);
+    await deleteRelationByPair(targetId, sourceId);
+
+    for (const rel of toRemove) {
+      await syncQueueService.enqueue('item_relation', rel.id, 'delete');
+    }
+  }
+
+  // ── Inbox Triage Helpers ───────────────────────────────────────────────
+
+  async getInboxItems(): Promise<Item[]> {
+    const all = await getAllItems();
+    return all.filter(item => {
+      const meta = item.metadata as InboxMetadata | undefined;
+      return meta?.inbox === true && !meta?.processed && !item.archived;
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async markItemProcessed(id: string): Promise<Item | null> {
+    const item = await getItemById(id);
+    if (!item) return null;
+    const meta = (item.metadata || {}) as InboxMetadata;
+    const updated = await this.updateItem(id, {
+      metadata: {
+        ...meta,
+        inbox: false,
+        processed: true,
+        processedAt: new Date().toISOString(),
+      },
+    });
+    if (updated) {
+      await this.logActivity('item_updated', updated, 'Processed from Inbox');
+    }
+    return updated;
+  }
+
+  async convertItemType(id: string, newType: ItemType): Promise<Item | null> {
+    const item = await getItemById(id);
+    if (!item) return null;
+    const oldType = item.type;
+    const updated = await this.updateItem(id, {
+      type: newType,
+    });
+    if (updated) {
+      await this.logActivity('item_updated', updated, `Converted from ${oldType} to ${newType}`);
+    }
+    return updated;
+  }
+
+  async assignItemProject(itemId: string, projectId: string): Promise<Item | null> {
+    const item = await getItemById(itemId);
+    const project = await getItemById(projectId);
+    if (!item || !project) return null;
+
+    const meta = (item.metadata || {}) as Record<string, unknown>;
+    const updated = await this.updateItem(itemId, {
+      metadata: {
+        ...meta,
+        projectId,
+      },
+    });
+
+    await this.linkItems(itemId, projectId, 'child');
+    return updated;
+  }
+
+  // ── Project Context Summary ────────────────────────────────────────────
+
+  async getProjectContext(projectId: string): Promise<ProjectContextSummary | null> {
+    const project = await getItemById(projectId);
+    if (!project) return null;
+
+    const [outgoingRels, incomingRels, allItems] = await Promise.all([
+      getRelationsForSource(projectId),
+      getRelationsForTarget(projectId),
+      getAllItems(),
+    ]);
+
+    const relatedItemIds = new Set<string>();
+    outgoingRels.forEach(r => relatedItemIds.add(r.targetId));
+    incomingRels.forEach(r => relatedItemIds.add(r.sourceId));
+
+    const projectItems = allItems.filter(item => {
+      if (item.id === projectId) return false;
+      if (relatedItemIds.has(item.id)) return true;
+      const meta = item.metadata as Record<string, unknown> | undefined;
+      if (meta && (meta.projectId === projectId || meta.project === project.title)) return true;
+      return false;
+    });
+
+    const tasks = projectItems.filter(i => i.type === 'task');
+    const openTasksCount = tasks.filter(t => {
+      const status = (t.metadata as { status?: string })?.status;
+      return status !== 'done' && status !== 'cancelled';
+    }).length;
+    const completedTasksCount = tasks.length - openTasksCount;
+
+    const notes = projectItems.filter(i => i.type === 'note' || i.type === 'journal');
+    const expenses = projectItems.filter(i => i.type === 'expense');
+    const totalExpenses = expenses.reduce((sum, e) => {
+      const amt = (e.metadata as TransactionMetadata)?.amount;
+      return sum + (typeof amt === 'number' ? amt : 0);
+    }, 0);
+    const trackers = projectItems.filter(i => i.type === 'tracker');
+    const goals = projectItems.filter(i => i.type === 'goal');
+
+    const allRelations = [...outgoingRels, ...incomingRels];
+
+    return {
+      project,
+      tasks,
+      openTasksCount,
+      completedTasksCount,
+      notes,
+      expenses,
+      totalExpenses,
+      trackers,
+      goals,
+      linkedItems: projectItems,
+      recentActivity: [],
+      relations: allRelations,
+    };
+  }
+
+  // ── Data Export & Schema-Validated Import ───────────────────────────────
+
+  async exportFullData(): Promise<string> {
+    const [items, relations, activityEvents] = await Promise.all([
+      getAllItems(),
+      getAllRelations(),
+      getAllActivityEvents(),
+    ]);
+
+    const exportPayload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items,
+      relations,
+      activityEvents,
+    };
+
+    return JSON.stringify(exportPayload, null, 2);
+  }
+
+  async importFullData(jsonString: string): Promise<{ success: boolean; itemsCount: number; relationsCount: number; error?: string }> {
+    try {
+      const data = JSON.parse(jsonString);
+      if (!data || typeof data !== 'object' || !Array.isArray(data.items)) {
+        return { success: false, itemsCount: 0, relationsCount: 0, error: 'Invalid JSON format: missing items array' };
+      }
+
+      const validTypes = new Set(['note', 'journal', 'task', 'tracker', 'habit', 'project', 'expense', 'income', 'goal', 'budget']);
+      const itemsToSave: Item[] = [];
+      for (const raw of data.items) {
+        if (!raw.id || typeof raw.id !== 'string') continue;
+        if (!raw.type || !validTypes.has(raw.type)) continue;
+        if (typeof raw.title !== 'string') continue;
+
+        itemsToSave.push({
+          id: raw.id,
+          type: raw.type,
+          title: raw.title,
+          content: typeof raw.content === 'string' ? raw.content : '',
+          tags: Array.isArray(raw.tags) ? raw.tags : [],
+          pinned: Boolean(raw.pinned),
+          archived: Boolean(raw.archived),
+          metadata: typeof raw.metadata === 'object' && raw.metadata !== null ? raw.metadata : {},
+          createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : new Date().toISOString(),
+          updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : new Date().toISOString(),
+        });
+      }
+
+      for (const item of itemsToSave) {
+        await saveItem(item);
+        await syncQueueService.enqueue('item', item.id, 'upsert', item);
+      }
+
+      let relationsCount = 0;
+      if (Array.isArray(data.relations)) {
+        for (const rel of data.relations) {
+          if (rel.id && rel.sourceId && rel.targetId) {
+            const cleanRel: ItemRelation = {
+              id: rel.id,
+              sourceId: rel.sourceId,
+              targetId: rel.targetId,
+              relationType: rel.relationType || 'linked',
+              createdAt: rel.createdAt || new Date().toISOString(),
+            };
+            await saveRelation(cleanRel);
+            await syncQueueService.enqueue('item_relation', cleanRel.id, 'upsert', cleanRel);
+            relationsCount++;
+          }
+        }
+      }
+
+      return { success: true, itemsCount: itemsToSave.length, relationsCount };
+    } catch (err: unknown) {
+      return {
+        success: false,
+        itemsCount: 0,
+        relationsCount: 0,
+        error: err instanceof Error ? err.message : 'Failed to parse import JSON',
+      };
+    }
+  }
+
+  async loadSampleData(): Promise<{ itemsCount: number; relationsCount: number }> {
+    const dataset = createSampleProjectDataset();
+    for (const item of dataset.items) {
+      await saveItem(item);
+      await syncQueueService.enqueue('item', item.id, 'upsert', item);
+    }
+    for (const rel of dataset.relations) {
+      await saveRelation(rel);
+      await syncQueueService.enqueue('item_relation', rel.id, 'upsert', rel);
+    }
+    return { itemsCount: dataset.items.length, relationsCount: dataset.relations.length };
   }
 
   // ── Activity ───────────────────────────────────────────────────────────
@@ -328,7 +570,6 @@ class DataService {
       createdAt: new Date().toISOString(),
     };
     await saveActivityEvent(event);
-    syncActivityToSb(event);
   }
 
   // ── Search ─────────────────────────────────────────────────────────────
@@ -367,6 +608,65 @@ class DataService {
       else expenses += meta.amount ?? 0;
     }
     return { income, expenses, net: income - expenses };
+  }
+
+  async getMonthlyBudgetProgress(): Promise<BudgetProgress[]> {
+    const [budgetItems, transactions] = await Promise.all([
+      getItemsByType('budget'),
+      this.getTransactionsThisMonth(),
+    ]);
+    const spendingByCategory = new Map<TransactionCategory, number>();
+
+    for (const transaction of transactions) {
+      const metadata = transaction.metadata as TransactionMetadata;
+      if (!metadata.isIncome) {
+        const category = metadata.category as TransactionCategory;
+        spendingByCategory.set(category, (spendingByCategory.get(category) ?? 0) + metadata.amount);
+      }
+    }
+
+    return budgetItems
+      .map(item => item as BudgetItem)
+      .filter(item => {
+        const metadata = item.metadata as BudgetMetadata;
+        return metadata.period === 'monthly' && Boolean(metadata.category) && metadata.limit > 0;
+      })
+      .map(budget => {
+        const metadata = budget.metadata as BudgetMetadata;
+        const spent = spendingByCategory.get(metadata.category!) ?? 0;
+        const percentage = (spent / metadata.limit) * 100;
+        return { budget, spent, percentage, isAlert: percentage >= 80 };
+      })
+      .sort((a, b) => b.percentage - a.percentage);
+  }
+
+  async saveMonthlyBudget(category: TransactionCategory, limit: number, currency = 'INR'): Promise<Item | null> {
+    if (!Number.isFinite(limit) || limit <= 0) return null;
+
+    const budgets = await getItemsByType('budget');
+    const existing = budgets.find(item => {
+      const metadata = item.metadata as BudgetMetadata;
+      return metadata.period === 'monthly' && metadata.category === category;
+    });
+    const metadata: BudgetMetadata = {
+      limit,
+      currency,
+      period: 'monthly',
+      category,
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+      alertThreshold: 0.8,
+    };
+
+    if (existing) {
+      return this.updateItem(existing.id, { metadata, title: `${category} monthly budget` });
+    }
+
+    return this.createItem({
+      type: 'budget',
+      title: `${category} monthly budget`,
+      content: '',
+      metadata,
+    });
   }
 
   // ── Tracker helpers ────────────────────────────────────────────────────
@@ -448,6 +748,83 @@ class DataService {
 
   async setSetting(key: string, value: unknown): Promise<void> {
     return setSetting(key, value);
+  }
+
+  // ── App-open streak ────────────────────────────────────────────────────
+
+  async getDailyStreak(): Promise<DailyStreakState | undefined> {
+    return this.getSetting<DailyStreakState>('daily-app-streak');
+  }
+
+  async getWeeklyDigestSummary(weekStart: string, weekEnding: string): Promise<WeeklyDigestSummary> {
+    const [items, streak, allRelations] = await Promise.all([
+      getAllItems(),
+      this.getDailyStreak(),
+      getAllRelations(),
+    ]);
+    const inWeek = (date?: string) => Boolean(date && date.slice(0, 10) >= weekStart && date.slice(0, 10) < weekEnding);
+    let income = 0;
+    let expenses = 0;
+
+    for (const item of items) {
+      if (item.type !== 'income' && item.type !== 'expense') continue;
+      const metadata = item.metadata as TransactionMetadata;
+      if (!inWeek(metadata.date)) continue;
+      if (metadata.isIncome) income += metadata.amount;
+      else expenses += metadata.amount;
+    }
+
+    const referenceCounts = new Map<string, number>();
+    for (const relation of allRelations) {
+      if (inWeek(relation.createdAt)) {
+        referenceCounts.set(relation.targetId, (referenceCounts.get(relation.targetId) ?? 0) + 1);
+      }
+    }
+
+    let topReferencedItem: WeeklyDigestSummary['topReferencedItem'];
+    let highestReferenceCount = 0;
+    for (const item of items) {
+      const count = referenceCounts.get(item.id) ?? 0;
+      if (count > highestReferenceCount) {
+        highestReferenceCount = count;
+        topReferencedItem = { title: item.title, references: count };
+      }
+    }
+
+    return {
+      weekEnding,
+      tasksCompleted: items.filter(item => item.type === 'task' && inWeek((item.metadata as { completedAt?: string }).completedAt)).length,
+      notesWritten: items.filter(item => (item.type === 'note' || item.type === 'journal') && inWeek(item.createdAt)).length,
+      streakDays: (streak?.openedDates ?? []).filter(date => inWeek(date)).length,
+      income,
+      expenses,
+      ...(topReferencedItem ? { topReferencedItem } : {}),
+    };
+  }
+
+  async recordDailyAppOpen(): Promise<DailyStreakState> {
+    const today = getLocalDateKey();
+    const existing = await this.getDailyStreak();
+
+    if (existing?.lastOpenedDate === today) return existing;
+
+    const lastOpenedDate = existing?.lastOpenedDate;
+    const continuesStreak = lastOpenedDate === getPreviousDateKey(today);
+    const currentStreak = continuesStreak ? (existing?.currentStreak ?? 0) + 1 : 1;
+    const milestoneReached = ([7, 30, 100] as const).find(milestone => milestone === currentStreak);
+    const streak: DailyStreakState = {
+      openedDates: [...(existing?.openedDates ?? []), today],
+      currentStreak,
+      longestStreak: Math.max(existing?.longestStreak ?? 0, currentStreak),
+      lastOpenedDate: today,
+      ...(lastOpenedDate && !continuesStreak && (existing?.currentStreak ?? 0) > 0
+        ? { endedStreak: existing?.currentStreak, endedOn: today }
+        : {}),
+      ...(milestoneReached ? { milestoneReached, milestoneReachedOn: today } : {}),
+    };
+
+    await this.setSetting('daily-app-streak', streak);
+    return streak;
   }
 
   // ── Task helpers ───────────────────────────────────────────────────────

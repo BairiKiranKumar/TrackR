@@ -21,7 +21,7 @@
 /* Desktop uses the sidebar nav instead */
 @media (min-width: 768px) {
   .nav {
-    display: none;
+    display: none !important;
   }
 }
 
@@ -30,12 +30,9 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(10, 10, 15, 0.85);
+  background: var(--bg-nav-glass);
   border-top: 1px solid var(--border-subtle);
-}
-
-[data-theme="light"] .nav::before {
-  background: rgba(255, 255, 255, 0.85);
+  transition: background var(--transition-base), border-color var(--transition-base);
 }
 
 .navItem {
@@ -80,6 +77,24 @@
   height: 4px;
   background: var(--accent-primary);
   border-radius: 50%;
+}
+
+.badgeDot {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--primary, #6366f1);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .label {

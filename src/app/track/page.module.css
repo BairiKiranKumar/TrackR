@@ -7,6 +7,15 @@
   padding-bottom: calc(var(--nav-height) + 24px);
 }
 
+@media (min-width: 768px) {
+  .page {
+    max-width: 100%;
+    margin: 0;
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -123,6 +132,20 @@
   margin-bottom: var(--space-3);
 }
 
+.trackerMainLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.trackerMainLink:hover .trackerName {
+  color: var(--accent-primary);
+}
+
 .trackerEmoji {
   font-size: 28px;
   line-height: 1;
@@ -169,11 +192,44 @@
   text-align: right;
 }
 
-.moreDays {
-  font-size: 11px;
-  color: var(--text-tertiary);
+.dayGridNav {
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.dayGridNavBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dayGridNavBtn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.dayGridNavBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dayGridNavLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 .streakTodayBtn {
@@ -219,6 +275,20 @@
   margin-bottom: 4px;
 }
 
+.goalLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.goalLink:hover .goalName {
+  color: var(--accent-primary);
+}
+
 .goalName {
   flex: 1;
   font-size: var(--font-size-base);
@@ -257,6 +327,20 @@
 }
 
 .projectCard:active { transform: scale(0.99); }
+
+.projectMainLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.projectMainLink:hover .projectName {
+  color: var(--accent-primary);
+}
 
 .projectEmoji {
   font-size: 28px;

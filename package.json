@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx --test src/__tests__/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.115.0",
@@ -24,6 +25,8 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "fake-indexeddb": "^6.2.5",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
