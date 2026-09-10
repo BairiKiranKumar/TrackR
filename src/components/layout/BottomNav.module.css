@@ -30,12 +30,9 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(10, 10, 15, 0.85);
+  background: var(--bg-nav-glass);
   border-top: 1px solid var(--border-subtle);
-}
-
-[data-theme="light"] .nav::before {
-  background: rgba(255, 255, 255, 0.85);
+  transition: background var(--transition-base), border-color var(--transition-base);
 }
 
 .navItem {

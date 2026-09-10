@@ -7,6 +7,15 @@
   padding-bottom: calc(var(--nav-height) + 24px);
 }
 
+@media (min-width: 768px) {
+  .page {
+    max-width: 100%;
+    margin: 0;
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
+}
+
 .loading {
   padding: var(--space-8);
 }
@@ -37,6 +46,118 @@
   color: var(--accent-secondary);
   opacity: 0.7;
   margin-top: 4px;
+}
+
+.streakCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.streakContent {
+  flex: 1;
+}
+
+.streakHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.streakCard strong {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.streakCard p {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.streakIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.streakIconCelebration {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(124, 111, 234, 0.25));
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.35);
+  animation: pulseIcon 1.8s infinite ease-in-out;
+}
+
+.streakMilestone {
+  border-color: rgba(251, 191, 36, 0.4);
+  background: linear-gradient(135deg, rgba(28, 28, 37, 0.95), rgba(40, 32, 55, 0.95));
+  box-shadow: 0 4px 20px rgba(124, 111, 234, 0.15), 0 0 0 1px rgba(251, 191, 36, 0.2);
+  animation: streakCelebration 0.75s ease both;
+}
+
+.milestoneBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #FBBF24, #F59E0B);
+  color: #0A0A0F;
+  text-transform: uppercase;
+}
+
+.confettiWrap {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confettiPiece {
+  position: absolute;
+  font-size: 14px;
+  opacity: 0;
+  animation: floatConfetti 3.5s infinite ease-in-out;
+}
+
+.c1 { left: 15%; top: 20%; color: #FBBF24; animation-delay: 0s; font-size: 16px; }
+.c2 { left: 40%; top: 10%; color: #34D399; animation-delay: 0.4s; font-size: 18px; }
+.c3 { left: 65%; top: 25%; color: #A78BFA; animation-delay: 0.8s; font-size: 14px; }
+.c4 { left: 80%; top: 15%; color: #F87171; animation-delay: 0.2s; font-size: 16px; }
+.c5 { left: 25%; top: 50%; color: #60A5FA; animation-delay: 1.1s; font-size: 12px; }
+.c6 { left: 90%; top: 40%; color: #FBBF24; animation-delay: 0.6s; font-size: 17px; }
+
+@keyframes floatConfetti {
+  0% { transform: translateY(10px) rotate(0deg) scale(0.6); opacity: 0; }
+  25% { opacity: 0.9; }
+  60% { transform: translateY(-16px) rotate(45deg) scale(1.1); opacity: 0.8; }
+  100% { transform: translateY(-30px) rotate(90deg) scale(0.7); opacity: 0; }
+}
+
+@keyframes pulseIcon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+@keyframes streakCelebration {
+  0% { transform: scale(0.96); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
 }
 
 /* Sections */

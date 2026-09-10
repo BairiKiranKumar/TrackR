@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { AlertTriangle, Plus, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
-import { Item, TransactionMetadata, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/types';
+import { BudgetProgress, Item, TransactionCategory, TransactionMetadata, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/types';
 import { formatAmount } from '@/lib/services/MoneyParser';
 import { dataService } from '@/lib/services/DataService';
 import { format } from 'date-fns';
@@ -19,9 +19,12 @@ export default function MoneyPage() {
   const [totals, setTotals] = useState({ income: 0, expenses: 0, net: 0 });
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
+  const [showBudgetForm, setShowBudgetForm] = useState(false);
+  const [budgetProgress, setBudgetProgress] = useState<BudgetProgress[]>([]);
 
   useEffect(() => {
     dataService.getMonthlyTotals().then(setTotals);
+    dataService.getMonthlyBudgetProgress().then(setBudgetProgress);
   }, [items]);
 
   const expenses = items.filter(i => i.type === 'expense');
@@ -34,6 +37,14 @@ export default function MoneyPage() {
       return new Date(bDate).getTime() - new Date(aDate).getTime();
     }
   );
+
+  async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
+    await dataService.deleteItem(id);
+    await refreshItems();
+  }
 
   return (
     <div className={styles.page}>
@@ -102,6 +113,27 @@ export default function MoneyPage() {
       {/* Overview tab */}
       {activeTab === 'overview' && (
         <div className={styles.content}>
+          <section className={styles.budgetSection}>
+            <div className="section-header">
+              <span className="section-title">Monthly Budgets</span>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowBudgetForm(true)} id="btn-set-budget">
+                <Plus size={14} /> Set budget
+              </button>
+            </div>
+            {budgetProgress.length === 0 ? (
+              <div className={styles.budgetEmpty}>Set a category budget to see this month&apos;s spending progress.</div>
+            ) : (
+              <div className={styles.budgetList}>
+                {budgetProgress.map(progress => (
+                  <BudgetProgressCard
+                    key={progress.budget.id}
+                    progress={progress}
+                    onDelete={(e) => handleDeleteItem(e, progress.budget.id, progress.budget.title || `${progress.budget.metadata.category} budget`)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
           <CategoryBreakdown transactions={expenses} type="expense" />
           <div style={{ height: 16 }} />
           {income.length > 0 && <CategoryBreakdown transactions={income} type="income" />}
@@ -119,7 +151,13 @@ export default function MoneyPage() {
             </div>
           ) : (
             <div className={styles.txnList}>
-              {allTxns.map(txn => <TransactionCard key={txn.id} txn={txn} />)}
+              {allTxns.map(txn => (
+                <TransactionCard
+                  key={txn.id}
+                  txn={txn}
+                  onDelete={(e) => handleDeleteItem(e, txn.id, txn.title)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -146,6 +184,14 @@ export default function MoneyPage() {
                     <div className={styles.goalHeader}>
                       <span className={styles.goalName}>⭐ {goal.title}</span>
                       <span className={styles.goalPct}>{Math.round(pct)}%</span>
+                      <button
+                        className="btn btn-icon btn-ghost"
+                        onClick={(e) => handleDeleteItem(e, goal.id, goal.title)}
+                        title="Delete goal"
+                        style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4 }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                     <div className="progress-track">
                       <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
@@ -189,11 +235,96 @@ export default function MoneyPage() {
           </div>
         </>
       )}
+      {showBudgetForm && (
+        <>
+          <div className="overlay" onClick={() => setShowBudgetForm(false)} />
+          <div className={styles.formSheet}>
+            <div className={styles.handle} />
+            <BudgetForm onClose={() => setShowBudgetForm(false)} onSaved={async () => { await refreshItems(); setShowBudgetForm(false); }} />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function TransactionCard({ txn }: { txn: Item }) {
+function BudgetProgressCard({ progress, onDelete }: { progress: BudgetProgress; onDelete?: (e: React.MouseEvent) => void }) {
+  const metadata = progress.budget.metadata;
+  const category = EXPENSE_CATEGORIES.find(item => item.value === metadata.category);
+  const isOver = progress.percentage >= 100;
+  const barColor = isOver ? 'var(--color-danger)' : progress.isAlert ? 'var(--color-warning)' : 'var(--accent-primary)';
+
+  return (
+    <div className={`${styles.budgetCard} ${progress.isAlert ? styles.budgetAlert : ''}`}>
+      <div className={styles.budgetHeader}>
+        <span>{category?.emoji ?? '💫'} {category?.label ?? metadata.category}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+          <span className={progress.isAlert ? styles.budgetWarning : styles.budgetAmount}>
+            {progress.isAlert && <AlertTriangle size={14} />} {Math.round(progress.percentage)}%
+          </span>
+          {onDelete && (
+            <button
+              className="btn btn-icon btn-ghost"
+              onClick={onDelete}
+              title="Delete budget"
+              style={{ color: 'var(--text-tertiary)', padding: 2 }}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${Math.min(progress.percentage, 100)}%`, background: barColor }} />
+      </div>
+      <div className={styles.budgetFooter}>
+        <span>{formatAmount(progress.spent)} spent</span>
+        <span>of {formatAmount(metadata.limit)}</span>
+      </div>
+    </div>
+  );
+}
+
+function BudgetForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
+  const [category, setCategory] = useState<TransactionCategory>('food');
+  const [limit, setLimit] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    const amount = Number(limit);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setSaving(true);
+    try {
+      await dataService.saveMonthlyBudget(category, amount);
+      await onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className={styles.budgetForm}>
+      <div className={styles.budgetFormHeader}>
+        <div>
+          <span className={styles.budgetFormTitle}>Set monthly budget</span>
+          <p>We&apos;ll alert you once spending reaches 80%.</p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
+      </div>
+      <label className="input-label" htmlFor="select-budget-category">Category</label>
+      <select id="select-budget-category" className="input" value={category} onChange={event => setCategory(event.target.value as TransactionCategory)}>
+        {EXPENSE_CATEGORIES.map(item => <option key={item.value} value={item.value}>{item.emoji} {item.label}</option>)}
+      </select>
+      <label className="input-label" htmlFor="input-budget-limit">Monthly limit (₹)</label>
+      <input id="input-budget-limit" className="input" inputMode="decimal" type="number" min="1" placeholder="0" value={limit} onChange={event => setLimit(event.target.value)} autoFocus />
+      <button className="btn btn-primary" onClick={save} disabled={saving || !limit} id="btn-save-budget">
+        {saving ? 'Saving…' : 'Save budget'}
+      </button>
+    </div>
+  );
+}
+
+function TransactionCard({ txn, onDelete }: { txn: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = txn.metadata as TransactionMetadata;
   const isIncome = meta.isIncome;
   const cat = isIncome
@@ -212,6 +343,16 @@ function TransactionCard({ txn }: { txn: Item }) {
       <span className={`${styles.txnAmount} ${isIncome ? styles.positive : styles.negative}`}>
         {isIncome ? '+' : '-'}{formatAmount(meta.amount)}
       </span>
+      {onDelete && (
+        <button
+          className="btn btn-icon btn-ghost"
+          onClick={onDelete}
+          title="Delete transaction"
+          style={{ color: 'var(--text-tertiary)', padding: 4, marginLeft: 8 }}
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
     </Link>
   );
 }

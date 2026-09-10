@@ -30,13 +30,18 @@ export default function AuthPage() {
 
   const configured = isSupabaseConfigured();
 
-  // If already signed in → redirect to home
+  // If already signed in → redirect to requested page or home
   useEffect(() => {
     getSession().then(s => {
-      if (s) router.replace('/');
-      else setChecking(false);
+      if (s) {
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const dest = params?.get('redirect') || '/';
+        router.replace(dest);
+      } else {
+        setChecking(false);
+      }
     });
-  }, []);
+  }, [router]);
 
   function clearMessages() {
     setError('');
@@ -160,7 +165,7 @@ export default function AuthPage() {
               </button>
               <h2 className={styles.forgotTitle}>Reset Password</h2>
               <p className={styles.forgotSub}>
-                Enter your email and we'll send you a reset link.
+                Enter your email and we&apos;ll send you a reset link.
               </p>
             </div>
           )}

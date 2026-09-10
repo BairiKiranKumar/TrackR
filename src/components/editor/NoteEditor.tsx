@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Bold, Italic, Hash, AtSign, Check, IndianRupee, ArrowLeft, MoreVertical, Type } from 'lucide-react';
+import { Bold, Italic, Hash, AtSign, Check, IndianRupee, ArrowLeft, MoreVertical, Type, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { dataService } from '@/lib/services/DataService';
 import { Item } from '@/types';
@@ -27,7 +27,6 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   const [title, setTitle] = useState(item.title || '');
   const [content, setContent] = useState(item.content || '');
   const [saved, setSaved] = useState(true);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // @ mention state
   const [atQuery, setAtQuery] = useState('');
@@ -59,7 +58,6 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
           if (onSaved) onSaved(updated);
         }
         setSaved(true);
-        setLastSaved(new Date());
       } catch (err) {
         console.error('Save error:', err);
       }
@@ -207,6 +205,17 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
 
   const formattedDate = format(new Date(item.createdAt), 'MMMM d, yyyy');
 
+  async function handleDeleteNote() {
+    if (!window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`)) return;
+    try {
+      await dataService.deleteItem(item.id);
+      await refreshItems();
+      router.push('/notes');
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  }
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -228,9 +237,21 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
             <span className={styles.saving}>Saving…</span>
           )}
         </div>
-        <button className="btn btn-icon btn-ghost" id="btn-note-more" aria-label="More options">
-          <MoreVertical size={20} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button
+            className="btn btn-icon btn-ghost"
+            onClick={handleDeleteNote}
+            id="btn-note-delete"
+            aria-label="Delete note"
+            title="Delete note"
+            style={{ color: 'var(--color-danger)' }}
+          >
+            <Trash2 size={18} />
+          </button>
+          <button className="btn btn-icon btn-ghost" id="btn-note-more" aria-label="More options">
+            <MoreVertical size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Editor area */}

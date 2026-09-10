@@ -1,4 +1,4 @@
-import { getMasterSupabase, isMasterSupabaseConfigured } from '@/lib/supabase';
+import { getMasterSupabase, isMasterSupabaseConfigured, clearSessionCookies } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 
 export type { User, Session };
@@ -51,6 +51,7 @@ export async function signInWithGoogle() {
 // ─── Sign Out ───────────────────────────────────────────────────────────────
 
 export async function signOut() {
+  clearSessionCookies();
   const sb = getMasterSupabase();
   if (!sb) return;
   await sb.auth.signOut();

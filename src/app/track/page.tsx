@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Target, CheckSquare, Flame, Star, Folder, Circle, CheckCircle2 } from 'lucide-react';
+import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { Item, TrackerMetadata, TaskMetadata } from '@/types';
 import { dataService } from '@/lib/services/DataService';
@@ -31,6 +31,14 @@ export default function TrackPage() {
 
   async function handleCompleteTask(taskId: string) {
     await dataService.completeTask(taskId);
+    await refreshItems();
+  }
+
+  async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
+    await dataService.deleteItem(id);
     await refreshItems();
   }
 
@@ -96,6 +104,15 @@ export default function TrackPage() {
                   )}
                 </Link>
                 {meta.priority === 'high' && <span className="badge badge-danger">!</span>}
+                <button
+                  className="btn btn-icon btn-ghost"
+                  onClick={(e) => handleDeleteItem(e, task.id, task.title)}
+                  id={`btn-delete-task-${task.id}`}
+                  title="Delete task"
+                  style={{ color: 'var(--text-tertiary)', padding: 4, flexShrink: 0 }}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             );
           })}
@@ -113,7 +130,7 @@ export default function TrackPage() {
             </div>
           )}
           {trackers.map(tracker => (
-            <TrackerCard key={tracker.id} tracker={tracker} onUpdate={refreshItems} />
+            <TrackerCard key={tracker.id} tracker={tracker} onUpdate={refreshItems} onDelete={(e) => handleDeleteItem(e, tracker.id, tracker.title)} />
           ))}
         </div>
       )}
@@ -128,7 +145,7 @@ export default function TrackPage() {
               <span className="empty-state__subtitle">Set targets and track your progress toward them.</span>
             </div>
           )}
-          {goals.map(goal => <GoalCard key={goal.id} goal={goal} />)}
+          {goals.map(goal => <GoalCard key={goal.id} goal={goal} onDelete={(e) => handleDeleteItem(e, goal.id, goal.title)} />)}
         </div>
       )}
 
@@ -142,7 +159,7 @@ export default function TrackPage() {
               <span className="empty-state__subtitle">Projects are containers. Use @references to connect notes, tasks, and money to them.</span>
             </div>
           )}
-          {projects.map(project => <ProjectCard key={project.id} project={project} />)}
+          {projects.map(project => <ProjectCard key={project.id} project={project} onDelete={(e) => handleDeleteItem(e, project.id, project.title)} />)}
         </div>
       )}
     </div>
@@ -151,7 +168,7 @@ export default function TrackPage() {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
-function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => void }) {
+function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate: () => void; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = tracker.metadata as TrackerMetadata;
   const isSeries = meta.trackerType === 'series';
   const isStreak = meta.trackerType === 'streak';
@@ -192,6 +209,16 @@ function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => voi
             )}
           </div>
         </div>
+        {onDelete && (
+          <button
+            className="btn btn-icon btn-ghost"
+            onClick={onDelete}
+            title="Delete tracker"
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4 }}
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
 
       {/* Progress bar for series */}
@@ -245,7 +272,7 @@ function TrackerCard({ tracker, onUpdate }: { tracker: Item; onUpdate: () => voi
   );
 }
 
-function GoalCard({ goal }: { goal: Item }) {
+function GoalCard({ goal, onDelete }: { goal: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = goal.metadata as { targetAmount?: number; currentAmount?: number; currency?: string; isFinancial?: boolean; target?: number; current?: number };
   const target = meta.targetAmount ?? meta.target ?? 0;
   const current = meta.currentAmount ?? meta.current ?? 0;
@@ -257,6 +284,16 @@ function GoalCard({ goal }: { goal: Item }) {
         <Star size={18} color="var(--color-goal)" />
         <span className={styles.goalName}>{goal.title}</span>
         <span className={styles.goalPct}>{Math.round(pct)}%</span>
+        {onDelete && (
+          <button
+            className="btn btn-icon btn-ghost"
+            onClick={onDelete}
+            title="Delete goal"
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4 }}
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
       <div className="progress-track" style={{ marginTop: 8 }}>
         <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
@@ -269,7 +306,7 @@ function GoalCard({ goal }: { goal: Item }) {
   );
 }
 
-function ProjectCard({ project }: { project: Item }) {
+function ProjectCard({ project, onDelete }: { project: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = project.metadata as { emoji?: string; color?: string; status?: string };
   return (
     <Link href={`/track/${project.id}`} className={styles.projectCard} id={`link-project-${project.id}`}>
@@ -284,6 +321,16 @@ function ProjectCard({ project }: { project: Item }) {
         <span className={`badge ${meta.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
           {meta.status}
         </span>
+      )}
+      {onDelete && (
+        <button
+          className="btn btn-icon btn-ghost"
+          onClick={onDelete}
+          title="Delete project"
+          style={{ color: 'var(--text-tertiary)', marginLeft: 8, padding: 4 }}
+        >
+          <Trash2 size={16} />
+        </button>
       )}
     </Link>
   );

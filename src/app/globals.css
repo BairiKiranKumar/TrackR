@@ -16,6 +16,8 @@
   --bg-elevated:    #252530;
   --bg-input:       #1A1A22;
   --bg-overlay:     rgba(0, 0, 0, 0.7);
+  --bg-header:      rgba(10, 10, 15, 0.85);
+  --bg-nav-glass:   rgba(10, 10, 15, 0.85);
 
   /* Text */
   --text-primary:   #F2F2F7;
@@ -112,6 +114,14 @@
   --bg-elevated:    #ECECF0;
   --bg-input:       #F0F0F5;
   --bg-overlay:     rgba(0, 0, 0, 0.4);
+  --bg-header:      rgba(255, 255, 255, 0.88);
+  --bg-nav-glass:   rgba(255, 255, 255, 0.88);
+
+  /* Semantic - tailored for crisp readability on light backgrounds */
+  --color-success:  #059669;
+  --color-warning:  #D97706;
+  --color-danger:   #DC2626;
+  --color-info:     #2563EB;
 
   --text-primary:   #1A1A2E;
   --text-secondary: #6B6B80;
@@ -179,18 +189,37 @@ body {
   padding-bottom: var(--nav-height);
 }
 
-/* Desktop: sidenav takes the left, main gets the rest */
+/* Desktop: sidenav takes the left, main gets the rest of the full width */
 @media (min-width: 768px) {
-  .app-main {
-    padding-bottom: 0; /* no bottom nav on desktop */
-    max-width: 860px;  /* comfortable reading width on large screens */
+  :root {
+    --max-width: 100%;
+    --page-padding: 32px;
   }
 
-  /* Wider content area on very large screens */
-  @media (min-width: 1200px) {
-    .app-main {
-      max-width: 960px;
-    }
+  #app-root {
+    width: 100%;
+    min-height: calc(100dvh - 52px);
+    display: flex;
+    flex-direction: row;
+  }
+
+  .app-main {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-bottom: 40px;
+  }
+
+  .app-main > [class*="page"] {
+    max-width: 100%;
+    margin: 0;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --page-padding: 40px;
   }
 }
 

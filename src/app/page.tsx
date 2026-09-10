@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ChevronRight, Zap, CheckCircle2, Circle } from 'lucide-react';
+import { ChevronRight, Flame, Zap, CheckCircle2, Circle } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -30,52 +30,56 @@ export default function RootPage() {
 }
 
 function HomeDashboard() {
-  const { items, refreshItems, isReady } = useAppContext();
+  const { items, refreshItems, isReady, dailyStreak } = useAppContext();
   const [todayTasks, setTodayTasks] = useState<Item[]>([]);
-  const [activeTrackers, setActiveTrackers] = useState<Item[]>([]);
-  const [recentNotes, setRecentNotes] = useState<Item[]>([]);
   const [monthlyTotals, setMonthlyTotals] = useState({ income: 0, expenses: 0, net: 0 });
   const [recentActivity, setRecentActivity] = useState<{ id: string; description: string; emoji: string; time: string }[]>([]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const loadData = useCallback(async () => {
-    const [tasks, totals, activity] = await Promise.all([
-      dataService.getTodayTasks(),
-      dataService.getMonthlyTotals(),
-      dataService.getRecentActivity(10),
-    ]);
+  const activeTrackers = useMemo(
+    () => items.filter(i => i.type === 'tracker' && !i.archived).slice(0, 3),
+    [items]
+  );
 
-    setTodayTasks(tasks.slice(0, 5));
-    setMonthlyTotals(totals);
+  const recentNotes = useMemo(
+    () => items.filter(i => (i.type === 'note' || i.type === 'journal') && !i.archived).slice(0, 3),
+    [items]
+  );
 
-    // Active trackers
-    const trackers = items
-      .filter(i => i.type === 'tracker' && !i.archived)
-      .slice(0, 3);
-    setActiveTrackers(trackers);
-
-    // Recent notes/journals
-    const notes = items
-      .filter(i => (i.type === 'note' || i.type === 'journal') && !i.archived)
-      .slice(0, 3);
-    setRecentNotes(notes);
-
-    // Format activity
-    const actItems = activity.slice(0, 5).map(a => ({
-      id: a.id,
-      description: a.description ?? a.itemTitle,
-      emoji: getActivityEmoji(a.type),
-      time: format(new Date(a.createdAt), 'h:mm a'),
-    }));
-    setRecentActivity(actItems);
-  }, [items]);
+  const isMilestone = Boolean(
+    dailyStreak &&
+    dailyStreak.milestoneReachedOn === dailyStreak.lastOpenedDate &&
+    dailyStreak.milestoneReached
+  );
 
   useEffect(() => {
     if (!isReady) return;
-    loadData();
-  }, [isReady, loadData]);
+    let active = true;
+
+    async function load() {
+      const [tasks, totals, activity] = await Promise.all([
+        dataService.getTodayTasks(),
+        dataService.getMonthlyTotals(),
+        dataService.getRecentActivity(10),
+      ]);
+      if (!active) return;
+      setTodayTasks(tasks.slice(0, 5));
+      setMonthlyTotals(totals);
+
+      const actItems = activity.slice(0, 5).map(a => ({
+        id: a.id,
+        description: a.description ?? a.itemTitle,
+        emoji: getActivityEmoji(a.type),
+        time: format(new Date(a.createdAt), 'h:mm a'),
+      }));
+      setRecentActivity(actItems);
+    }
+
+    load();
+    return () => { active = false; };
+  }, [isReady, items]);
 
   async function handleCompleteTask(taskId: string) {
     await dataService.completeTask(taskId);
@@ -96,6 +100,41 @@ function HomeDashboard() {
         </div>
         <Zap size={22} className={styles.zapIcon} />
       </div>
+
+      {dailyStreak && (
+        <section className={`${styles.streakCard} ${isMilestone ? styles.streakMilestone : ''}`}>
+          {isMilestone && (
+            <div className={styles.confettiWrap} aria-hidden="true">
+              <span className={`${styles.confettiPiece} ${styles.c1}`}>✦</span>
+              <span className={`${styles.confettiPiece} ${styles.c2}`}>🎉</span>
+              <span className={`${styles.confettiPiece} ${styles.c3}`}>★</span>
+              <span className={`${styles.confettiPiece} ${styles.c4}`}>✨</span>
+              <span className={`${styles.confettiPiece} ${styles.c5}`}>◆</span>
+              <span className={`${styles.confettiPiece} ${styles.c6}`}>🎈</span>
+            </div>
+          )}
+          <div className={`${styles.streakIcon} ${isMilestone ? styles.streakIconCelebration : ''}`}>
+            <Flame size={20} />
+          </div>
+          <div className={styles.streakContent}>
+            <div className={styles.streakHeader}>
+              <strong>{dailyStreak.currentStreak}-day app streak</strong>
+              {isMilestone && (
+                <span className={styles.milestoneBadge}>
+                  {dailyStreak.milestoneReached} DAYS!
+                </span>
+              )}
+            </div>
+            {dailyStreak.endedOn === dailyStreak.lastOpenedDate && dailyStreak.endedStreak ? (
+              <p>Your {dailyStreak.endedStreak}-day streak ended — start a new one today.</p>
+            ) : isMilestone ? (
+              <p>🎉 Milestone unlocked! You reached {dailyStreak.milestoneReached} consecutive days.</p>
+            ) : (
+              <p>Open TRACKR each day to keep it going.</p>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Today's Tasks */}
       {todayTasks.length > 0 && (

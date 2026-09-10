@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Trash2 } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
 import { Item, ItemRelation, TrackerMetadata, TaskMetadata, ITEM_TYPE_EMOJIS, ITEM_TYPE_LABELS } from '@/types';
 import { formatAmount } from '@/lib/services/MoneyParser';
@@ -16,6 +16,20 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [backlinks, setBacklinks] = useState<{ relation: ItemRelation; item: Item }[]>([]);
   const [outgoing, setOutgoing] = useState<{ relation: ItemRelation; item: Item }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!item) return;
+    const confirmed = window.confirm(`Are you sure you want to delete "${item.title}"?`);
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await dataService.deleteItem(item.id);
+      router.back();
+    } catch {
+      setDeleting(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -57,6 +71,16 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         <span className={styles.typeLabel}>
           {ITEM_TYPE_EMOJIS[item.type]} {ITEM_TYPE_LABELS[item.type]}
         </span>
+        <button
+          className="btn btn-icon btn-ghost"
+          onClick={handleDelete}
+          disabled={deleting}
+          id="btn-item-delete"
+          title="Delete item"
+          style={{ marginLeft: 'auto', color: 'var(--color-danger, #ef4444)' }}
+        >
+          <Trash2 size={18} />
+        </button>
       </div>
 
       {/* Title */}

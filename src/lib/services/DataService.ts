@@ -2,16 +2,28 @@ import {
   getAllItems, getItemById, getItemsByType, saveItem,
   archiveItem as localArchiveItem, getRelationsForSource, getRelationsForTarget,
   saveRelation, deleteRelationsForSource, getRecentActivity,
-  saveActivityEvent, searchItems, getSetting, setSetting,
+  saveActivityEvent, searchItems, getSetting, setSetting, getAllRelations,
+  deleteItem as localDeleteItem, deleteRelationsForItem, clearAllData as localClearAllData,
 } from '@/lib/db/localDb';
-import { parseReferences, buildRelationsFromText } from './ReferenceParser';
-import { Item, ItemType, ItemRelation, ActivityEvent, ActivityEventType } from '@/types';
+import { buildRelationsFromText } from './ReferenceParser';
+import { BudgetItem, BudgetMetadata, BudgetProgress, DailyStreakState, Item, ItemType, ItemRelation, ActivityEvent, ActivityEventType, TransactionCategory, TransactionMetadata, WeeklyDigestSummary } from '@/types';
 import { getUserSupabase } from '@/lib/supabase';
 
 // ─── ID generation ─────────────────────────────────────────────────────────
 function genId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function getLocalDateKey(date = new Date()): string {
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 10);
+}
+
+function getPreviousDateKey(dateKey: string): string {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() - 1);
+  return getLocalDateKey(date);
 }
 
 // ─── Supabase transform helpers ─────────────────────────────────────────────
@@ -64,6 +76,25 @@ async function syncArchiveToSb(id: string): Promise<void> {
   if (!sb) return;
   try {
     await sb.from('items').update({ archived: true, updated_at: new Date().toISOString() }).eq('id', id);
+  } catch { /* swallow */ }
+}
+
+async function syncDeleteItemToSb(id: string): Promise<void> {
+  const sb = getUserSupabase();
+  if (!sb) return;
+  try {
+    await sb.from('items').delete().eq('id', id);
+    await sb.from('item_relations').delete().or(`source_id.eq.${id},target_id.eq.${id}`);
+  } catch { /* swallow */ }
+}
+
+async function syncClearAllToSb(): Promise<void> {
+  const sb = getUserSupabase();
+  if (!sb) return;
+  try {
+    await sb.from('items').delete().neq('id', '0');
+    await sb.from('item_relations').delete().neq('id', '0');
+    await sb.from('activity_events').delete().neq('id', '0');
   } catch { /* swallow */ }
 }
 
@@ -258,6 +289,17 @@ class DataService {
     syncArchiveToSb(id);
   }
 
+  async deleteItem(id: string): Promise<void> {
+    await localDeleteItem(id);
+    await deleteRelationsForItem(id);
+    syncDeleteItemToSb(id);
+  }
+
+  async clearAllData(): Promise<void> {
+    await localClearAllData();
+    syncClearAllToSb();
+  }
+
   // ── References ─────────────────────────────────────────────────────────
 
   async updateReferencesFromContent(sourceId: string, content: string): Promise<void> {
@@ -369,6 +411,65 @@ class DataService {
     return { income, expenses, net: income - expenses };
   }
 
+  async getMonthlyBudgetProgress(): Promise<BudgetProgress[]> {
+    const [budgetItems, transactions] = await Promise.all([
+      getItemsByType('budget'),
+      this.getTransactionsThisMonth(),
+    ]);
+    const spendingByCategory = new Map<TransactionCategory, number>();
+
+    for (const transaction of transactions) {
+      const metadata = transaction.metadata as TransactionMetadata;
+      if (!metadata.isIncome) {
+        const category = metadata.category as TransactionCategory;
+        spendingByCategory.set(category, (spendingByCategory.get(category) ?? 0) + metadata.amount);
+      }
+    }
+
+    return budgetItems
+      .map(item => item as BudgetItem)
+      .filter(item => {
+        const metadata = item.metadata as BudgetMetadata;
+        return metadata.period === 'monthly' && Boolean(metadata.category) && metadata.limit > 0;
+      })
+      .map(budget => {
+        const metadata = budget.metadata as BudgetMetadata;
+        const spent = spendingByCategory.get(metadata.category!) ?? 0;
+        const percentage = (spent / metadata.limit) * 100;
+        return { budget, spent, percentage, isAlert: percentage >= 80 };
+      })
+      .sort((a, b) => b.percentage - a.percentage);
+  }
+
+  async saveMonthlyBudget(category: TransactionCategory, limit: number, currency = 'INR'): Promise<Item | null> {
+    if (!Number.isFinite(limit) || limit <= 0) return null;
+
+    const budgets = await getItemsByType('budget');
+    const existing = budgets.find(item => {
+      const metadata = item.metadata as BudgetMetadata;
+      return metadata.period === 'monthly' && metadata.category === category;
+    });
+    const metadata: BudgetMetadata = {
+      limit,
+      currency,
+      period: 'monthly',
+      category,
+      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+      alertThreshold: 0.8,
+    };
+
+    if (existing) {
+      return this.updateItem(existing.id, { metadata, title: `${category} monthly budget` });
+    }
+
+    return this.createItem({
+      type: 'budget',
+      title: `${category} monthly budget`,
+      content: '',
+      metadata,
+    });
+  }
+
   // ── Tracker helpers ────────────────────────────────────────────────────
 
   async completeTrackerDay(trackerId: string, dayIndex?: number, date?: string): Promise<Item | null> {
@@ -448,6 +549,83 @@ class DataService {
 
   async setSetting(key: string, value: unknown): Promise<void> {
     return setSetting(key, value);
+  }
+
+  // ── App-open streak ────────────────────────────────────────────────────
+
+  async getDailyStreak(): Promise<DailyStreakState | undefined> {
+    return this.getSetting<DailyStreakState>('daily-app-streak');
+  }
+
+  async getWeeklyDigestSummary(weekStart: string, weekEnding: string): Promise<WeeklyDigestSummary> {
+    const [items, streak, allRelations] = await Promise.all([
+      getAllItems(),
+      this.getDailyStreak(),
+      getAllRelations(),
+    ]);
+    const inWeek = (date?: string) => Boolean(date && date.slice(0, 10) >= weekStart && date.slice(0, 10) < weekEnding);
+    let income = 0;
+    let expenses = 0;
+
+    for (const item of items) {
+      if (item.type !== 'income' && item.type !== 'expense') continue;
+      const metadata = item.metadata as TransactionMetadata;
+      if (!inWeek(metadata.date)) continue;
+      if (metadata.isIncome) income += metadata.amount;
+      else expenses += metadata.amount;
+    }
+
+    const referenceCounts = new Map<string, number>();
+    for (const relation of allRelations) {
+      if (inWeek(relation.createdAt)) {
+        referenceCounts.set(relation.targetId, (referenceCounts.get(relation.targetId) ?? 0) + 1);
+      }
+    }
+
+    let topReferencedItem: WeeklyDigestSummary['topReferencedItem'];
+    let highestReferenceCount = 0;
+    for (const item of items) {
+      const count = referenceCounts.get(item.id) ?? 0;
+      if (count > highestReferenceCount) {
+        highestReferenceCount = count;
+        topReferencedItem = { title: item.title, references: count };
+      }
+    }
+
+    return {
+      weekEnding,
+      tasksCompleted: items.filter(item => item.type === 'task' && inWeek((item.metadata as { completedAt?: string }).completedAt)).length,
+      notesWritten: items.filter(item => (item.type === 'note' || item.type === 'journal') && inWeek(item.createdAt)).length,
+      streakDays: (streak?.openedDates ?? []).filter(date => inWeek(date)).length,
+      income,
+      expenses,
+      ...(topReferencedItem ? { topReferencedItem } : {}),
+    };
+  }
+
+  async recordDailyAppOpen(): Promise<DailyStreakState> {
+    const today = getLocalDateKey();
+    const existing = await this.getDailyStreak();
+
+    if (existing?.lastOpenedDate === today) return existing;
+
+    const lastOpenedDate = existing?.lastOpenedDate;
+    const continuesStreak = lastOpenedDate === getPreviousDateKey(today);
+    const currentStreak = continuesStreak ? (existing?.currentStreak ?? 0) + 1 : 1;
+    const milestoneReached = ([7, 30, 100] as const).find(milestone => milestone === currentStreak);
+    const streak: DailyStreakState = {
+      openedDates: [...(existing?.openedDates ?? []), today],
+      currentStreak,
+      longestStreak: Math.max(existing?.longestStreak ?? 0, currentStreak),
+      lastOpenedDate: today,
+      ...(lastOpenedDate && !continuesStreak && (existing?.currentStreak ?? 0) > 0
+        ? { endedStreak: existing?.currentStreak, endedOn: today }
+        : {}),
+      ...(milestoneReached ? { milestoneReached, milestoneReachedOn: today } : {}),
+    };
+
+    await this.setSetting('daily-app-streak', streak);
+    return streak;
   }
 
   // ── Task helpers ───────────────────────────────────────────────────────

@@ -28,17 +28,17 @@ const QUICK_ITEMS: {
 
 interface QuickAddProps {
   onClose: () => void;
+  initialType?: 'note';
 }
 
-export function QuickAdd({ onClose }: QuickAddProps) {
+export function QuickAdd({ onClose, initialType }: QuickAddProps) {
   const router = useRouter();
   const { refreshItems } = useAppContext();
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
-  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [showNoteInput, setShowNoteInput] = useState(() => initialType === 'note');
   const [noteTitle, setNoteTitle] = useState('');
-  const [taskInput, setTaskInput] = useState('');
-  const [activeType, setActiveType] = useState<ItemType | null>(null);
+  const [activeType, setActiveType] = useState<ItemType | null>(initialType ?? null);
 
   async function handleSelect(type: ItemType) {
     if (type === 'expense') { setShowExpenseForm(true); setActiveType(type); return; }

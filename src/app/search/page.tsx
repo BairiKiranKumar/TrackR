@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search as SearchIcon, X } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
@@ -10,7 +10,6 @@ import styles from './page.module.css';
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [results, setResults] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);

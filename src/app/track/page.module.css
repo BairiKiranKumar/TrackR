@@ -7,6 +7,15 @@
   padding-bottom: calc(var(--nav-height) + 24px);
 }
 
+@media (min-width: 768px) {
+  .page {
+    max-width: 100%;
+    margin: 0;
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
+}
+
 .header {
   display: flex;
   align-items: center;

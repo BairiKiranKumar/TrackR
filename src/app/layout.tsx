@@ -5,6 +5,8 @@ import { AuthProvider } from '@/components/providers/AuthProvider';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { SideNav } from '@/components/layout/SideNav';
+import { GlobalShortcuts } from '@/components/layout/GlobalShortcuts';
+import { WeeklyDigest } from '@/components/layout/WeeklyDigest';
 
 export const metadata: Metadata = {
   title: 'TRACKR — Write it. Track it. Link it. Understand it.',
@@ -27,11 +29,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body>
         <AuthProvider>
           <AppProvider>
             <AppHeader />
+            <GlobalShortcuts />
+            <WeeklyDigest />
             <div id="app-root">
               <SideNav />
               <main className="app-main">

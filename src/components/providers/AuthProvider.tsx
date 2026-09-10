@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { getSession, signOut, isSupabaseConfigured } from '@/lib/auth/AuthService';
-import { getMasterSupabase, initUserSupabase, clearUserSupabase } from '@/lib/supabase';
+import { getMasterSupabase, initUserSupabase, clearUserSupabase, syncSessionCookies, clearSessionCookies } from '@/lib/supabase';
 import { getUserConfig, type UserConfig } from '@/lib/services/UserConfigService';
 import { dataService } from '@/lib/services/DataService';
 import { useRouter, usePathname } from 'next/navigation';
@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userConfig, setUserConfig] = useState<UserConfig | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const configured = isSupabaseConfigured();
+  const [isLoading, setIsLoading] = useState(configured);
 
   // The auth-state-change subscription below is wired up once on mount, so
   // `handleAuthState` must not close over a stale `pathname` from that first
@@ -85,16 +85,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const currentPath = pathnameRef.current;
 
     if (newUser) {
+      syncSessionCookies(newSession);
       const config = await loadUserConfig(newUser.id);
       const isOnAuth = currentPath.startsWith('/auth');
 
       if (isOnAuth) {
-        if (config) router.replace('/');
+        const redirectUrl = typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('redirect') || '/'
+          : '/';
+        if (config) router.replace(redirectUrl);
         else router.replace('/auth/setup');
       } else if (!config && !currentPath.startsWith('/auth')) {
         router.replace('/auth/setup');
       }
     } else {
+      clearSessionCookies();
       clearUserSupabase();
       setUserConfig(null);
       // Only redirect if on a protected route
@@ -107,8 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadUserConfig, router]);
 
   useEffect(() => {
+    syncSessionCookies();
     if (!configured) {
-      setIsLoading(false);
       return;
     }
 

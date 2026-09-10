@@ -101,6 +101,18 @@ export interface BudgetMetadata {
   [key: string]: unknown;
 }
 
+/** Consecutive local calendar days on which the signed-in user opened TRACKR. */
+export interface DailyStreakState {
+  openedDates: string[];
+  currentStreak: number;
+  longestStreak: number;
+  lastOpenedDate: string;
+  endedStreak?: number;
+  endedOn?: string;
+  milestoneReached?: 7 | 30 | 100;
+  milestoneReachedOn?: string;
+}
+
 export interface GoalMetadata {
   targetAmount: number;
   currentAmount: number;
@@ -221,6 +233,24 @@ export interface QuickAddState {
   defaultType?: ItemType;
 }
 
+export interface InAppNotification {
+  id: string;
+  kind: 'overdue_task' | 'streak_milestone' | 'budget_alert';
+  title: string;
+  description: string;
+  href?: string;
+}
+
+export interface WeeklyDigestSummary {
+  weekEnding: string;
+  tasksCompleted: number;
+  notesWritten: number;
+  streakDays: number;
+  income: number;
+  expenses: number;
+  topReferencedItem?: { title: string; references: number };
+}
+
 export type Theme = 'dark' | 'light';
 
 // ─── Supabase sync ─────────────────────────────────────────────────────────
@@ -242,8 +272,16 @@ export type TrackerItem = Item & { metadata: TrackerMetadata };
 export type TaskItem = Item & { metadata: TaskMetadata };
 export type NoteItem = Item & { metadata: NoteMetadata };
 export type TransactionItem = Item & { metadata: TransactionMetadata };
+export type BudgetItem = Item & { metadata: BudgetMetadata };
 export type ProjectItem = Item & { metadata: ProjectMetadata };
 export type GoalItem = Item & { metadata: GoalMetadata };
+
+export interface BudgetProgress {
+  budget: BudgetItem;
+  spent: number;
+  percentage: number;
+  isAlert: boolean;
+}
 
 export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   note: 'Note',

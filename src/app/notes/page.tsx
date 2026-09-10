@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Pin, BookOpen, FileText } from 'lucide-react';
+import { Search, Plus, Pin, BookOpen, FileText, Trash2 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { Item } from '@/types';
 import { format } from 'date-fns';
@@ -36,6 +36,14 @@ export default function NotesPage() {
     });
     await refreshItems();
     router.push(`/notes/${item.id}`);
+  }
+
+  async function handleDeleteNote(e: React.MouseEvent, id: string, title: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`)) return;
+    await dataService.deleteItem(id);
+    await refreshItems();
   }
 
   return (
@@ -92,7 +100,13 @@ export default function NotesPage() {
             <span className="section-title"><Pin size={11} style={{ display: 'inline', marginRight: 4 }} />Pinned</span>
           </div>
           <div className={styles.noteList}>
-            {pinned.map(note => <NoteCard key={note.id} note={note} />)}
+            {pinned.map(note => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                onDelete={(e) => handleDeleteNote(e, note.id, note.title)}
+              />
+            ))}
           </div>
         </>
       )}
@@ -105,7 +119,13 @@ export default function NotesPage() {
             </div>
           )}
           <div className={styles.noteList}>
-            {rest.map(note => <NoteCard key={note.id} note={note} />)}
+            {rest.map(note => (
+              <NoteCard
+                key={note.id}
+                note={note}
+                onDelete={(e) => handleDeleteNote(e, note.id, note.title)}
+              />
+            ))}
           </div>
         </>
       )}
@@ -113,7 +133,7 @@ export default function NotesPage() {
   );
 }
 
-function NoteCard({ note }: { note: Item }) {
+function NoteCard({ note, onDelete }: { note: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const preview = note.content?.replace(/\n/g, ' ').slice(0, 80) || 'Empty note';
   const isJournal = note.type === 'journal';
 
@@ -129,6 +149,16 @@ function NoteCard({ note }: { note: Item }) {
         </span>
         <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
         {note.pinned && <Pin size={12} className={styles.pinIcon} />}
+        {onDelete && (
+          <button
+            className="btn btn-icon btn-ghost"
+            onClick={onDelete}
+            title="Delete note"
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 2 }}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
       <p className={styles.notePreview}>{preview}</p>
       <div className={styles.noteMeta}>

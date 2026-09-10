@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Moon, Sun, Database, RefreshCw, Wifi,
-  Download, ChevronRight, LogOut,
+  Download, ChevronRight, LogOut, Trash2,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -13,8 +13,9 @@ import styles from './page.module.css';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { theme, toggleTheme } = useAppContext();
+  const { theme, toggleTheme, refreshItems } = useAppContext();
   const { user, userConfig, signOut } = useAuth();
+  const [clearing, setClearing] = useState(false);
 
   async function handleExport() {
     const items = await dataService.getAllItems();
@@ -26,6 +27,32 @@ export default function SettingsPage() {
     a.download = `trackr-export-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleClearAllData() {
+    const confirmed = window.confirm(
+      '⚠️ WARNING: Are you sure you want to clear ALL data?\n\nThis will permanently delete all tasks, notes, trackers, budgets, transactions, and links from both this device and Supabase. This action cannot be undone.'
+    );
+    if (!confirmed) return;
+    const doubleConfirmed = window.prompt(
+      'Type CLEAR to confirm wiping all data:'
+    );
+    if (doubleConfirmed !== 'CLEAR') {
+      alert('Clear cancelled: confirmation phrase did not match.');
+      return;
+    }
+
+    setClearing(true);
+    try {
+      await dataService.clearAllData();
+      await refreshItems();
+      alert('All data has been cleared.');
+    } catch (err) {
+      console.error('Clear error:', err);
+      alert('Failed to clear all data. Check console for details.');
+    } finally {
+      setClearing(false);
+    }
   }
 
   return (
@@ -43,10 +70,12 @@ export default function SettingsPage() {
           <div className={styles.card}>
             <div className={styles.accountRow}>
               <div className={styles.avatar}>
-                {user.user_metadata?.avatar_url
-                  ? <img src={user.user_metadata.avatar_url} alt="Avatar" className={styles.avatarImg} />
-                  : <span className={styles.avatarInitial}>{user.email?.[0]?.toUpperCase() ?? 'U'}</span>
-                }
+                {user.user_metadata?.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={user.user_metadata.avatar_url} alt="Avatar" className={styles.avatarImg} />
+                ) : (
+                  <span className={styles.avatarInitial}>{user.email?.[0]?.toUpperCase() ?? 'U'}</span>
+                )}
               </div>
               <div className={styles.accountInfo}>
                 <span className={styles.accountName}>
@@ -163,6 +192,25 @@ export default function SettingsPage() {
             <div className={styles.settingInfo2}>
               <span className={styles.settingLabel}>Export Data</span>
               <span className={styles.settingSubtitle}>Download all your items as JSON</span>
+            </div>
+            <ChevronRight size={16} className={styles.chevron} />
+          </button>
+          <div style={{ height: 1, background: 'var(--border-subtle)', margin: '0 16px' }} />
+          <button
+            className={styles.actionRow}
+            onClick={handleClearAllData}
+            disabled={clearing}
+            id="btn-clear-all-data"
+            style={{ color: 'var(--color-danger)' }}
+          >
+            <Trash2 size={18} className={styles.settingIcon} style={{ color: 'var(--color-danger)' }} />
+            <div className={styles.settingInfo2}>
+              <span className={styles.settingLabel} style={{ color: 'var(--color-danger)' }}>
+                {clearing ? 'Clearing Data…' : 'Clear All Data'}
+              </span>
+              <span className={styles.settingSubtitle}>
+                Wipe all demo & created items from local storage and Supabase
+              </span>
             </div>
             <ChevronRight size={16} className={styles.chevron} />
           </button>

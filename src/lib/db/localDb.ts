@@ -135,6 +135,11 @@ export async function getRelationsForTarget(targetId: string): Promise<ItemRelat
   return db.getAllFromIndex('item_relations', 'by-target', targetId);
 }
 
+export async function getAllRelations(): Promise<ItemRelation[]> {
+  const db = await getDb();
+  return db.getAll('item_relations');
+}
+
 export async function saveRelation(relation: ItemRelation): Promise<void> {
   const db = await getDb();
   await db.put('item_relations', relation);
@@ -146,6 +151,28 @@ export async function deleteRelationsForSource(sourceId: string): Promise<void> 
   const tx = db.transaction('item_relations', 'readwrite');
   await Promise.all(relations.map(r => tx.store.delete(r.id)));
   await tx.done;
+}
+
+export async function deleteRelationsForItem(itemId: string): Promise<void> {
+  const db = await getDb();
+  const [sourceRels, targetRels] = await Promise.all([
+    db.getAllFromIndex('item_relations', 'by-source', itemId),
+    db.getAllFromIndex('item_relations', 'by-target', itemId),
+  ]);
+  const allIds = Array.from(new Set([...sourceRels.map(r => r.id), ...targetRels.map(r => r.id)]));
+  if (!allIds.length) return;
+  const tx = db.transaction('item_relations', 'readwrite');
+  await Promise.all(allIds.map(id => tx.store.delete(id)));
+  await tx.done;
+}
+
+export async function clearAllData(): Promise<void> {
+  const db = await getDb();
+  await Promise.all([
+    db.clear('items'),
+    db.clear('item_relations'),
+    db.clear('activity_events'),
+  ]);
 }
 
 // ─── Activity ──────────────────────────────────────────────────────────────
