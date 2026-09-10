@@ -9,7 +9,7 @@ import { dataService } from '@/lib/services/DataService';
 import { BudgetProgress, InAppNotification, TaskMetadata } from '@/types';
 import styles from './AppHeader.module.css';
 
-type SyncDot = 'synced' | 'syncing' | 'offline' | 'idle';
+type SyncDot = 'synced' | 'syncing' | 'pending' | 'failed' | 'offline' | 'idle';
 
 const HIDE_HEADER_ROUTES = ['/auth', '/auth/callback', '/auth/setup'];
 
@@ -21,13 +21,19 @@ export function AppHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncDot>('idle');
+  const [pendingCount, setPendingCount] = useState(0);
   const [budgetAlerts, setBudgetAlerts] = useState<BudgetProgress[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // All hooks run before the authentication/page early return so their order
   // remains stable as the auth state changes.
   useEffect(() => {
-    const unsubscribe = dataService.onSyncStatusChange(status => setSyncStatus(status as SyncDot));
+    const unsubscribe = dataService.onSyncStatusChange((status, state) => {
+      setSyncStatus(status as SyncDot);
+      if (state) {
+        setPendingCount(state.pendingCount);
+      }
+    });
     return unsubscribe;
   }, []);
 
@@ -89,8 +95,22 @@ export function AppHeader() {
   const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
   const initial = (user.user_metadata?.full_name as string || user.email || 'U')[0].toUpperCase();
   const displayName = (user.user_metadata?.full_name as string) ?? user.email?.split('@')[0] ?? 'User';
-  const syncLabel = { synced: 'Synced', syncing: 'Syncing…', offline: 'Offline', idle: userConfig ? 'Connected' : 'Local only' }[syncStatus];
-  const SyncIcon = syncStatus === 'syncing' ? RefreshCw : syncStatus === 'offline' ? WifiOff : Wifi;
+  const syncLabel = {
+    synced: 'Synced',
+    syncing: 'Syncing…',
+    pending: pendingCount > 0 ? `Pending (${pendingCount})` : 'Pending',
+    failed: 'Sync issue',
+    offline: 'Offline',
+    idle: userConfig ? 'Connected' : 'Local only',
+  }[syncStatus] || 'Local only';
+  const SyncIcon =
+    syncStatus === 'syncing' || syncStatus === 'pending'
+      ? RefreshCw
+      : syncStatus === 'failed'
+      ? CircleAlert
+      : syncStatus === 'offline'
+      ? WifiOff
+      : Wifi;
 
   return (
     <header className={styles.header} id="app-header">

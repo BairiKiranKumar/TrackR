@@ -43,6 +43,20 @@ function HomeDashboard() {
     [items]
   );
 
+  const activeProjects = useMemo(
+    () => items.filter(i => i.type === 'project' && !i.archived).slice(0, 3),
+    [items]
+  );
+
+  const inboxCount = useMemo(
+    () => items.filter(i => {
+      if (i.archived) return false;
+      const meta = i.metadata as Record<string, unknown> | undefined;
+      return meta?.inbox === true && !meta?.processed;
+    }).length,
+    [items]
+  );
+
   const recentNotes = useMemo(
     () => items.filter(i => (i.type === 'note' || i.type === 'journal') && !i.archived).slice(0, 3),
     [items]
@@ -101,6 +115,23 @@ function HomeDashboard() {
         <Zap size={22} className={styles.zapIcon} />
       </div>
 
+      {/* Inbox Triage Prompt */}
+      {inboxCount > 0 && (
+        <div className={styles.inboxBanner}>
+          <div className={styles.inboxBannerLeft}>
+            <span className={styles.inboxBannerBadge}>{inboxCount}</span>
+            <div className={styles.inboxBannerText}>
+              <strong>{inboxCount} item{inboxCount > 1 ? 's' : ''} in Inbox</strong>
+              <p>Triage and connect to projects to keep your workspace clear.</p>
+            </div>
+          </div>
+          <Link href="/inbox" className={styles.inboxBannerBtn} id="link-today-inbox-triage">
+            <span>Triage</span>
+            <ChevronRight size={14} />
+          </Link>
+        </div>
+      )}
+
       {dailyStreak && (
         <section className={`${styles.streakCard} ${isMilestone ? styles.streakMilestone : ''}`}>
           {isMilestone && (
@@ -132,6 +163,37 @@ function HomeDashboard() {
             ) : (
               <p>Open TRACKR each day to keep it going.</p>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* Active Projects Spotlight */}
+      {activeProjects.length > 0 && (
+        <section className={styles.section}>
+          <div className="section-header">
+            <span className="section-title">Projects</span>
+            <Link href="/projects" className={styles.seeAll} id="link-home-projects-all">
+              See all <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className={styles.projectsRow}>
+            {activeProjects.map(proj => (
+              <Link
+                key={proj.id}
+                href={`/track/${proj.id}`}
+                className={styles.projectSpotlightCard}
+              >
+                <div className={styles.projSpotlightTop}>
+                  <span className={styles.projSpotlightEmoji}>
+                    {(proj.metadata as Record<string, unknown>)?.emoji as string || '📁'}
+                  </span>
+                  <span className={styles.projSpotlightTitle}>{proj.title}</span>
+                </div>
+                {proj.content && (
+                  <p className={styles.projSpotlightDesc}>{proj.content}</p>
+                )}
+              </Link>
+            ))}
           </div>
         </section>
       )}

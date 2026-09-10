@@ -1,11 +1,37 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  ExternalLink,
+  Trash2,
+  Folder,
+  Link2,
+  Plus,
+  X,
+  CheckCircle2,
+  Circle,
+  FileText,
+  DollarSign,
+  TrendingUp,
+  Tag,
+  ArrowRight,
+  Sparkles,
+} from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
-import { Item, ItemRelation, TrackerMetadata, TaskMetadata, ITEM_TYPE_EMOJIS, ITEM_TYPE_LABELS } from '@/types';
+import {
+  Item,
+  ItemRelation,
+  TrackerMetadata,
+  TaskMetadata,
+  ProjectMetadata,
+  ProjectContextSummary,
+  RelationType,
+  ITEM_TYPE_EMOJIS,
+  ITEM_TYPE_LABELS,
+} from '@/types';
 import { formatAmount } from '@/lib/services/MoneyParser';
 import { format } from 'date-fns';
 import styles from './page.module.css';
@@ -15,8 +41,54 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [item, setItem] = useState<Item | null>(null);
   const [backlinks, setBacklinks] = useState<{ relation: ItemRelation; item: Item }[]>([]);
   const [outgoing, setOutgoing] = useState<{ relation: ItemRelation; item: Item }[]>([]);
+  const [projectContext, setProjectContext] = useState<ProjectContextSummary | null>(null);
+  const [allItems, setAllItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+
+  // Link Modal state
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkRelationType, setLinkRelationType] = useState<RelationType>('linked');
+
+  // Quick task input for projects
+  const [newProjectTask, setNewProjectTask] = useState('');
+
+  async function loadData() {
+    const { id } = await params;
+    if (id === 'new') {
+      router.push('/track');
+      return;
+    }
+
+    const [found, blinks, out, all] = await Promise.all([
+      dataService.getItemById(id),
+      dataService.getBacklinks(id),
+      dataService.getOutgoingReferences(id),
+      dataService.getAllItems(),
+    ]);
+
+    if (!found) {
+      router.replace('/track');
+      return;
+    }
+
+    setItem(found);
+    setBacklinks(blinks);
+    setOutgoing(out);
+    setAllItems(all);
+
+    if (found.type === 'project') {
+      const ctx = await dataService.getProjectContext(found.id);
+      setProjectContext(ctx);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadData();
+  }, [params]);
 
   async function handleDelete() {
     if (!item) return;
@@ -31,25 +103,80 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  useEffect(() => {
-    async function load() {
-      const { id } = await params;
-      if (id === 'new') { router.push('/track'); return; }
+  async function handleAddLink(targetId: string) {
+    if (!item) return;
+    await dataService.linkItems(item.id, targetId, linkRelationType);
+    setShowLinkModal(false);
+    setLinkSearch('');
+    await loadData();
+  }
 
-      const [found, blinks, out] = await Promise.all([
-        dataService.getItemById(id),
-        dataService.getBacklinks(id),
-        dataService.getOutgoingReferences(id),
-      ]);
+  async function handleUnlink(sourceId: string, targetId: string) {
+    await dataService.unlinkItems(sourceId, targetId);
+    await loadData();
+  }
 
-      if (!found) { router.replace('/track'); return; }
-      setItem(found);
-      setBacklinks(blinks);
-      setOutgoing(out);
-      setLoading(false);
+  async function handleToggleTask(taskId: string) {
+    const t = allItems.find(i => i.id === taskId);
+    if (!t) return;
+    const meta = t.metadata as TaskMetadata;
+    const isDone = meta.status === 'done';
+    await dataService.updateItem(taskId, {
+      metadata: {
+        ...meta,
+        status: isDone ? 'todo' : 'done',
+        completedAt: isDone ? undefined : new Date().toISOString(),
+      },
+    });
+    await loadData();
+  }
+
+  async function handleAddProjectTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!item || !newProjectTask.trim()) return;
+    const task = await dataService.createItem({
+      type: 'task',
+      title: newProjectTask.trim(),
+      metadata: {
+        status: 'todo',
+        priority: 'medium',
+        projectId: item.id,
+      },
+    });
+    await dataService.linkItems(task.id, item.id, 'child');
+    setNewProjectTask('');
+    await loadData();
+  }
+
+  // Find assigned project for non-project items
+  const parentProject = useMemo(() => {
+    if (!item || item.type === 'project') return null;
+    const meta = item.metadata as Record<string, unknown>;
+    const projId = meta.projectId as string | undefined;
+    if (projId) {
+      return allItems.find(i => i.id === projId && i.type === 'project') || null;
     }
-    load();
-  }, [params]);
+    // Check if any outgoing relation has type child to a project
+    const childRel = outgoing.find(r => r.item.type === 'project');
+    if (childRel) return childRel.item;
+    return null;
+  }, [item, outgoing, allItems]);
+
+  const candidateItems = useMemo(() => {
+    if (!item) return [];
+    const q = linkSearch.trim().toLowerCase();
+    return allItems
+      .filter(i => i.id !== item.id && !i.archived)
+      .filter(i => {
+        if (!q) return true;
+        return (
+          i.title.toLowerCase().includes(q) ||
+          i.type.toLowerCase().includes(q) ||
+          i.tags.some(t => t.toLowerCase().includes(q))
+        );
+      })
+      .slice(0, 15);
+  }, [allItems, item, linkSearch]);
 
   if (loading) {
     return (
@@ -83,11 +210,156 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         </button>
       </div>
 
-      {/* Title */}
+      {/* Title & Context Meta */}
       <div className={styles.titleSection}>
-        <h1 className={styles.title}>{item.title}</h1>
+        <div className={styles.titleHeaderRow}>
+          <h1 className={styles.title}>{item.title}</h1>
+        </div>
         <p className={styles.date}>{format(new Date(item.createdAt), 'MMMM d, yyyy')}</p>
       </div>
+
+      {/* Context Card — "What is this related to?" */}
+      <div className={styles.contextCard}>
+        <div className={styles.contextCardHeader}>
+          <div className={styles.contextHeaderTitle}>
+            <Link2 size={16} className={styles.contextIcon} />
+            <span className={styles.contextTitle}>Context & Connections</span>
+          </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowLinkModal(true)}
+            id="btn-add-context-link"
+          >
+            <Plus size={14} />
+            <span>Link Item</span>
+          </button>
+        </div>
+
+        <div className={styles.contextDetailsRow}>
+          {item.type !== 'project' && (
+            <div className={styles.contextField}>
+              <span className={styles.contextLabel}>Project</span>
+              {parentProject ? (
+                <Link href={`/track/${parentProject.id}`} className={styles.projectPill}>
+                  <Folder size={12} />
+                  <span>{parentProject.title}</span>
+                </Link>
+              ) : (
+                <span className={styles.unassignedText}>No parent project attached</span>
+              )}
+            </div>
+          )}
+
+          <div className={styles.contextField}>
+            <span className={styles.contextLabel}>Connections</span>
+            <span className={styles.connectionStats}>
+              {outgoing.length} outgoing • {backlinks.length} backlink{backlinks.length === 1 ? '' : 's'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Project Cockpit View (Exclusive when item is a project) */}
+      {item.type === 'project' && projectContext && (
+        <div className={styles.projectCockpit}>
+          <div className={styles.cockpitMetrics}>
+            <div className={styles.cockpitMetricCard}>
+              <span className={styles.cockpitMetricLabel}>
+                <CheckCircle2 size={14} /> Tasks Completed
+              </span>
+              <span className={styles.cockpitMetricValue}>
+                {projectContext.completedTasksCount} / {projectContext.tasks.length}
+              </span>
+            </div>
+
+            <div className={styles.cockpitMetricCard}>
+              <span className={styles.cockpitMetricLabel}>
+                <FileText size={14} /> Linked Notes
+              </span>
+              <span className={styles.cockpitMetricValue}>
+                {projectContext.notes.length}
+              </span>
+            </div>
+
+            <div className={styles.cockpitMetricCard}>
+              <span className={styles.cockpitMetricLabel}>
+                <DollarSign size={14} /> Tracked Spend
+              </span>
+              <span className={styles.cockpitMetricValue}>
+                ₹{projectContext.totalExpenses.toLocaleString('en-IN')}
+              </span>
+            </div>
+
+            {projectContext.trackers.length > 0 && (
+              <div className={styles.cockpitMetricCard}>
+                <span className={styles.cockpitMetricLabel}>
+                  <TrendingUp size={14} /> Active Trackers
+                </span>
+                <span className={styles.cockpitMetricValue}>
+                  {projectContext.trackers.length}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Project Task Checklist */}
+          <div className={styles.section}>
+            <div className="section-header">
+              <span className="section-title">Project Tasks</span>
+              <span className={styles.count}>{projectContext.tasks.length}</span>
+            </div>
+
+            <form onSubmit={handleAddProjectTask} className={styles.quickAddForm}>
+              <input
+                type="text"
+                className={styles.quickAddInput}
+                placeholder="Add task to this project…"
+                value={newProjectTask}
+                onChange={e => setNewProjectTask(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary btn-sm"
+                disabled={!newProjectTask.trim()}
+              >
+                <Plus size={14} />
+                <span>Add</span>
+              </button>
+            </form>
+
+            <div className={styles.cockpitTaskList}>
+              {projectContext.tasks.length === 0 ? (
+                <p className={styles.emptyText}>No tasks created for this project yet.</p>
+              ) : (
+                projectContext.tasks.map(t => {
+                  const meta = t.metadata as TaskMetadata;
+                  const isDone = meta.status === 'done';
+                  return (
+                    <div key={t.id} className={styles.cockpitTaskItem}>
+                      <button
+                        className={styles.taskCheckbox}
+                        onClick={() => handleToggleTask(t.id)}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={18} className={styles.taskDoneIcon} />
+                        ) : (
+                          <Circle size={18} className={styles.taskTodoIcon} />
+                        )}
+                      </button>
+                      <Link
+                        href={`/track/${t.id}`}
+                        className={`${styles.cockpitTaskTitle} ${isDone ? styles.taskTitleDone : ''}`}
+                      >
+                        {t.title}
+                      </Link>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Type-specific content */}
       {renderTypeContent(item)}
@@ -95,7 +367,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       {/* Content / Description */}
       {item.content && (
         <div className={styles.section}>
-          <div className="section-header"><span className="section-title">Notes</span></div>
+          <div className="section-header"><span className="section-title">Notes & Details</span></div>
           <div className={styles.contentBlock}>
             {item.content.split('\n').map((line, i) => (
               <p key={i} style={{ minHeight: line ? undefined : 8 }}>{line}</p>
@@ -117,19 +389,34 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       {outgoing.length > 0 && (
         <div className={styles.section}>
           <div className="section-header">
-            <span className="section-title">References</span>
+            <span className="section-title">Linked Outgoing Items</span>
             <span className={styles.count}>{outgoing.length}</span>
           </div>
           <div className={styles.refList}>
-            {outgoing.map(({ item: ref }) => (
-              <Link key={ref.id} href={`/track/${ref.id}`} className={styles.refCard} id={`link-ref-${ref.id}`}>
-                <span className={styles.refEmoji}>{ITEM_TYPE_EMOJIS[ref.type]}</span>
-                <div className={styles.refInfo}>
-                  <span className={styles.refTitle}>{ref.title}</span>
-                  <span className={styles.refType}>{ITEM_TYPE_LABELS[ref.type]}</span>
-                </div>
-                <ExternalLink size={14} className={styles.refIcon} />
-              </Link>
+            {outgoing.map(({ item: ref, relation }) => (
+              <div key={ref.id} className={styles.refCardWrap}>
+                <Link
+                  href={ref.type === 'note' || ref.type === 'journal' ? `/notes/${ref.id}` : `/track/${ref.id}`}
+                  className={styles.refCard}
+                  id={`link-ref-${ref.id}`}
+                >
+                  <span className={styles.refEmoji}>{ITEM_TYPE_EMOJIS[ref.type]}</span>
+                  <div className={styles.refInfo}>
+                    <span className={styles.refTitle}>{ref.title}</span>
+                    <span className={styles.refType}>
+                      {ITEM_TYPE_LABELS[ref.type]} • {relation.relationType}
+                    </span>
+                  </div>
+                  <ExternalLink size={14} className={styles.refIcon} />
+                </Link>
+                <button
+                  className={styles.unlinkBtn}
+                  onClick={() => handleUnlink(item.id, ref.id)}
+                  title="Remove connection"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -138,33 +425,126 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       {/* Backlinks — the knowledge graph magic */}
       <div className={styles.section}>
         <div className="section-header">
-          <span className="section-title">Referenced In</span>
+          <span className="section-title">Incoming References & Backlinks</span>
           <span className={styles.count}>{backlinks.length}</span>
         </div>
         {backlinks.length === 0 ? (
           <p className={styles.emptyText}>
-            No items reference this yet. Start writing @{item.title} in a note to link it.
+            No items reference this yet. Mention @{item.title} or click &quot;Link Item&quot; to connect it.
           </p>
         ) : (
           <div className={styles.refList}>
-            {backlinks.map(({ item: src }) => (
-              <Link
-                key={src.id}
-                href={src.type === 'note' || src.type === 'journal' ? `/notes/${src.id}` : `/track/${src.id}`}
-                className={styles.refCard}
-                id={`link-backlink-${src.id}`}
-              >
-                <span className={styles.refEmoji}>{ITEM_TYPE_EMOJIS[src.type]}</span>
-                <div className={styles.refInfo}>
-                  <span className={styles.refTitle}>{src.title}</span>
-                  <span className={styles.refType}>{ITEM_TYPE_LABELS[src.type]} · {format(new Date(src.updatedAt), 'MMM d')}</span>
-                </div>
-                <ExternalLink size={14} className={styles.refIcon} />
-              </Link>
+            {backlinks.map(({ item: src, relation }) => (
+              <div key={src.id} className={styles.refCardWrap}>
+                <Link
+                  key={src.id}
+                  href={src.type === 'note' || src.type === 'journal' ? `/notes/${src.id}` : `/track/${src.id}`}
+                  className={styles.refCard}
+                  id={`link-backlink-${src.id}`}
+                >
+                  <span className={styles.refEmoji}>{ITEM_TYPE_EMOJIS[src.type]}</span>
+                  <div className={styles.refInfo}>
+                    <span className={styles.refTitle}>{src.title}</span>
+                    <span className={styles.refType}>
+                      {ITEM_TYPE_LABELS[src.type]} • {relation.relationType} • {format(new Date(src.updatedAt), 'MMM d')}
+                    </span>
+                  </div>
+                  <ExternalLink size={14} className={styles.refIcon} />
+                </Link>
+                <button
+                  className={styles.unlinkBtn}
+                  onClick={() => handleUnlink(src.id, item.id)}
+                  title="Remove connection"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Manual Link Modal */}
+      {showLinkModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowLinkModal(false)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitleRow}>
+                <Link2 size={18} className={styles.modalTitleIcon} />
+                <h3 className={styles.modalTitle}>Connect Context</h3>
+              </div>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowLinkModal(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className={styles.modalDesc}>
+              Link <strong>&quot;{item.title}&quot;</strong> with another item in your database.
+            </p>
+
+            <div className={styles.modalRelationSelect}>
+              <label className={styles.modalLabel}>Relationship</label>
+              <select
+                className={styles.modalSelect}
+                value={linkRelationType}
+                onChange={e => setLinkRelationType(e.target.value as RelationType)}
+              >
+                <option value="linked">Related to (Bidirectional)</option>
+                <option value="child">Child of</option>
+                <option value="parent">Parent of</option>
+                <option value="references">References</option>
+              </select>
+            </div>
+
+            <div className={styles.modalSearchWrap}>
+              <input
+                type="search"
+                className={styles.modalSearchInput}
+                placeholder="Search items to connect…"
+                value={linkSearch}
+                onChange={e => setLinkSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className={styles.candidateList}>
+              {candidateItems.length === 0 ? (
+                <div className={styles.emptyCandidates}>
+                  No items found matching your search.
+                </div>
+              ) : (
+                candidateItems.map(candidate => (
+                  <button
+                    key={candidate.id}
+                    className={styles.candidateItem}
+                    onClick={() => handleAddLink(candidate.id)}
+                  >
+                    <div className={styles.candidateInfo}>
+                      <span className={styles.candidateEmoji}>
+                        {ITEM_TYPE_EMOJIS[candidate.type] || '📄'}
+                      </span>
+                      <div className={styles.candidateTexts}>
+                        <span className={styles.candidateTitle}>
+                          {candidate.title || 'Untitled'}
+                        </span>
+                        <span className={styles.candidateSub}>
+                          {ITEM_TYPE_LABELS[candidate.type]}
+                          {candidate.tags.length > 0 && ` • #${candidate.tags.join(' #')}`}
+                        </span>
+                      </div>
+                    </div>
+                    <ArrowRight size={15} className={styles.candidateArrow} />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ height: 40 }} />
     </div>

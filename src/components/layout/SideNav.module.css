@@ -53,6 +53,38 @@
   color: var(--text-primary);
 }
 
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navGroupLabel {
+  font-size: 0.675rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0.5rem 0.75rem 0.25rem 0.75rem;
+}
+
+.navDivider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0.5rem 0.5rem;
+}
+
+.inboxBadge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary, #6366f1);
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
 .navItem.active {
   background: var(--accent-glow);
   color: var(--accent-secondary);

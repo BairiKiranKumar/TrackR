@@ -44,6 +44,9 @@ export type IncomeCategory =
 export interface NoteMetadata {
   pinned?: boolean;
   wordCount?: number;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -52,6 +55,29 @@ export interface TaskMetadata {
   dueDate?: string;
   priority?: 'low' | 'medium' | 'high';
   completedAt?: string;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
+  [key: string]: unknown;
+}
+
+export interface JournalMetadata {
+  mood?: 'great' | 'good' | 'okay' | 'down' | 'stressed';
+  date?: string;
+  weather?: string;
+  location?: string;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
+  [key: string]: unknown;
+}
+
+export interface InboxMetadata {
+  inbox?: boolean;
+  processed?: boolean;
+  capturedVia?: 'quick_add' | 'shortcut' | 'manual';
+  originalInput?: string;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -68,6 +94,7 @@ export interface TrackerMetadata {
   emoji?: string;
   color?: string;           // accent color hex
   startDate?: string;       // ISO date
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -88,6 +115,9 @@ export interface TransactionMetadata {
   account?: string;
   date: string;             // ISO date
   isIncome: boolean;
+  inbox?: boolean;
+  processed?: boolean;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -119,6 +149,7 @@ export interface GoalMetadata {
   currency: string;
   deadline?: string;
   isFinancial: boolean;
+  projectId?: string;
   [key: string]: unknown;
 }
 
@@ -126,12 +157,16 @@ export interface ProjectMetadata {
   emoji?: string;
   color?: string;
   status?: 'active' | 'completed' | 'paused';
+  targetDate?: string;
+  description?: string;
   [key: string]: unknown;
 }
 
 export type ItemMetadata =
   | NoteMetadata
   | TaskMetadata
+  | JournalMetadata
+  | InboxMetadata
   | TrackerMetadata
   | TrackerDayMetadata
   | TransactionMetadata
@@ -139,6 +174,85 @@ export type ItemMetadata =
   | GoalMetadata
   | ProjectMetadata
   | Record<string, unknown>;
+
+// ─── Sync Queue ────────────────────────────────────────────────────────────
+
+export type SyncOperationType =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'upsert'
+  | 'clear'
+  | 'relation_create'
+  | 'relation_delete'
+  | 'clear_all';
+
+export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'failed' | 'synced' | 'offline';
+
+export interface SyncOperation {
+  id: string;
+  entityType: 'item' | 'item_relation' | 'database';
+  entityId: string;
+  operation: SyncOperationType;
+  payload?: unknown;
+  createdAt: string;
+  retryCount: number;
+  lastAttemptAt?: string;
+  lastError?: string;
+  status: SyncStatus;
+}
+
+// ─── Capability & Extension Interfaces ─────────────────────────────────────
+
+export interface CaptureResult {
+  title: string;
+  type: ItemType;
+  content?: string;
+  projectId?: string;
+  tags: string[];
+  inbox: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CaptureProcessor {
+  process(rawInput: string, allProjects?: Item[]): Promise<CaptureResult>;
+}
+
+export interface MoneyDetectionResult {
+  amount: number;
+  currency: string;
+  rawText: string;
+  startIndex?: number;
+  endIndex?: number;
+}
+
+export interface MoneyDetector {
+  detect(text: string): MoneyDetectionResult[];
+}
+
+export interface AIProvider {
+  classifyCapture(input: string): Promise<{ type: ItemType; tags: string[] }>;
+  suggestRelations(item: Item, existingItems: Item[]): Promise<{ targetId: string; reason: string }[]>;
+  summarize(items: Item[]): Promise<string>;
+  semanticSearch(query: string, items: Item[]): Promise<Item[]>;
+}
+
+// ─── Project Context Aggregation ───────────────────────────────────────────
+
+export interface ProjectContextSummary {
+  project: Item;
+  tasks: Item[];
+  openTasksCount: number;
+  completedTasksCount: number;
+  notes: Item[];
+  trackers: Item[];
+  expenses: Item[];
+  totalExpenses: number;
+  goals: Item[];
+  linkedItems: Item[];
+  recentActivity: ActivityEvent[];
+  relations: ItemRelation[];
+}
 
 // ─── Core Item ─────────────────────────────────────────────────────────────
 
@@ -157,7 +271,7 @@ export interface Item {
 
 // ─── Relations ─────────────────────────────────────────────────────────────
 
-export type RelationType = 'references' | 'contains' | 'linked';
+export type RelationType = 'references' | 'contains' | 'linked' | 'parent' | 'child';
 
 export interface ItemRelation {
   id: string;
@@ -260,7 +374,7 @@ export interface SupabaseConfig {
   anonKey: string;
 }
 
-export interface SyncStatus {
+export interface SupabaseSyncState {
   connected: boolean;
   lastSyncedAt?: string;
   error?: string;

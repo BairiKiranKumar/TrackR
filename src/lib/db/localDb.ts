@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Item, ItemRelation, ActivityEvent } from '@/types';
+import { Item, ItemRelation, ActivityEvent, SyncOperation } from '@/types';
 
 // ─── DB Schema ─────────────────────────────────────────────────────────────
 
@@ -34,12 +34,20 @@ interface TrackrDB extends DBSchema {
     key: string;
     value: { key: string; value: unknown };
   };
+  sync_queue: {
+    key: string;
+    value: SyncOperation;
+    indexes: {
+      'by-status': string;
+      'by-createdAt': string;
+    };
+  };
 }
 
 // ─── DB Instance ───────────────────────────────────────────────────────────
 
 const DB_NAME = 'trackr-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<TrackrDB>> | null = null;
 
@@ -73,6 +81,13 @@ export function getDb(): Promise<IDBPDatabase<TrackrDB>> {
         // Settings store
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+
+        // Sync queue store
+        if (!db.objectStoreNames.contains('sync_queue')) {
+          const queueStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
+          queueStore.createIndex('by-status', 'status');
+          queueStore.createIndex('by-createdAt', 'createdAt');
         }
       },
     });
@@ -142,6 +157,10 @@ export async function getAllRelations(): Promise<ItemRelation[]> {
 
 export async function saveRelation(relation: ItemRelation): Promise<void> {
   const db = await getDb();
+  // Deduplication check: do not insert duplicate relation between same source & target
+  const existing = await db.getAllFromIndex('item_relations', 'by-source', relation.sourceId);
+  const isDuplicate = existing.some(r => r.targetId === relation.targetId && r.relationType === relation.relationType);
+  if (isDuplicate) return;
   await db.put('item_relations', relation);
 }
 
@@ -151,6 +170,20 @@ export async function deleteRelationsForSource(sourceId: string): Promise<void> 
   const tx = db.transaction('item_relations', 'readwrite');
   await Promise.all(relations.map(r => tx.store.delete(r.id)));
   await tx.done;
+}
+
+export async function deleteRelation(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete('item_relations', id);
+}
+
+export async function deleteRelationByPair(sourceId: string, targetId: string): Promise<void> {
+  const db = await getDb();
+  const rels = await db.getAllFromIndex('item_relations', 'by-source', sourceId);
+  const match = rels.find(r => r.targetId === targetId);
+  if (match) {
+    await db.delete('item_relations', match.id);
+  }
 }
 
 export async function deleteRelationsForItem(itemId: string): Promise<void> {
@@ -172,7 +205,56 @@ export async function clearAllData(): Promise<void> {
     db.clear('items'),
     db.clear('item_relations'),
     db.clear('activity_events'),
+    db.clear('sync_queue'),
   ]);
+}
+
+// ─── Sync Queue Helpers ───────────────────────────────────────────────────
+
+export async function enqueueSyncOp(op: SyncOperation): Promise<void> {
+  const db = await getDb();
+  await db.put('sync_queue', op);
+}
+
+export async function getPendingSyncOps(limit = 50): Promise<SyncOperation[]> {
+  const db = await getDb();
+  const all = await db.getAll('sync_queue');
+  return all
+    .filter(op => op.status === 'pending' || op.status === 'failed')
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .slice(0, limit);
+}
+
+export async function getAllSyncOps(): Promise<SyncOperation[]> {
+  const db = await getDb();
+  return db.getAll('sync_queue');
+}
+
+export async function updateSyncOp(op: SyncOperation): Promise<void> {
+  const db = await getDb();
+  await db.put('sync_queue', op);
+}
+
+export async function deleteSyncOp(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete('sync_queue', id);
+}
+
+export async function clearSyncQueue(): Promise<void> {
+  const db = await getDb();
+  await db.clear('sync_queue');
+}
+
+// ─── Tags ──────────────────────────────────────────────────────────────────
+
+export async function getItemsByTag(tag: string): Promise<Item[]> {
+  const normalized = tag.toLowerCase().replace(/^#/, '');
+  const db = await getDb();
+  const all = await db.getAll('items');
+  return all
+    .filter(item => !item.archived)
+    .filter(item => item.tags.some(t => t.toLowerCase() === normalized))
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 }
 
 // ─── Activity ──────────────────────────────────────────────────────────────
@@ -186,6 +268,11 @@ export async function getRecentActivity(limit = 50): Promise<ActivityEvent[]> {
 export async function saveActivityEvent(event: ActivityEvent): Promise<void> {
   const db = await getDb();
   await db.put('activity_events', event);
+}
+
+export async function getAllActivityEvents(): Promise<ActivityEvent[]> {
+  const db = await getDb();
+  return db.getAll('activity_events');
 }
 
 // ─── Settings ──────────────────────────────────────────────────────────────

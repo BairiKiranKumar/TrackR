@@ -7,7 +7,7 @@ import { dataService } from '@/lib/services/DataService';
 import { Item } from '@/types';
 import { AtMention } from './AtMention';
 import { MoneyDetector } from './MoneyDetector';
-import { detectMoneyAmounts } from '@/lib/services/MoneyParser';
+import { moneyDetectionService } from '@/lib/services/MoneyDetectionService';
 import styles from './NoteEditor.module.css';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { format } from 'date-fns';
@@ -71,7 +71,7 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
     autoSave(title, text);
 
     // Detect money amounts
-    const detections = detectMoneyAmounts(text);
+    const detections = moneyDetectionService.detect(text);
     setMoneyDetections(detections.slice(0, 1)); // show top 1 suggestion
 
     // Detect @ trigger
@@ -181,10 +181,10 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   }
 
   async function handleMoneyAccept(amount: number) {
-    await dataService.createItem({
+    const expense = await dataService.createItem({
       type: 'expense',
-      title: `₹${amount} expense`,
-      content: content.slice(0, 100),
+      title: `₹${amount.toLocaleString('en-IN')} expense`,
+      content: `Expense noted from "${title || 'Note'}"`,
       metadata: {
         amount,
         currency: 'INR',
@@ -193,6 +193,7 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
         date: new Date().toISOString().split('T')[0],
       },
     });
+    await dataService.linkItems(item.id, expense.id, 'references');
     await refreshItems();
     setMoneyDetections([]);
   }
