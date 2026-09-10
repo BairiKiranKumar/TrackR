@@ -2,16 +2,28 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 1040px;
+  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0 1rem 3rem 1rem;
+  padding: 0 var(--page-padding);
+  padding-top: calc(env(safe-area-inset-top, 0) + 20px);
+  padding-bottom: calc(var(--nav-height) + 24px);
   width: 100%;
+}
+
+@media (min-width: 768px) {
+  .page {
+    max-width: 100%;
+    margin: 0;
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
 }
 
 .header {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  padding-top: var(--space-4);
 }
 
 .headerTitleRow {

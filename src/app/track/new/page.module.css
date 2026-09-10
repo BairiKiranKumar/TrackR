@@ -3,15 +3,25 @@
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 var(--page-padding);
-  padding-top: calc(env(safe-area-inset-top, 0) + 12px);
+  padding-top: calc(env(safe-area-inset-top, 0) + 20px);
   padding-bottom: calc(var(--nav-height) + 24px);
+}
+
+@media (min-width: 768px) {
+  .page {
+    max-width: 720px;
+    margin: 0;
+    padding-top: 24px;
+    padding-bottom: 48px;
+  }
 }
 
 .header {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) 0;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-3);
   margin-bottom: var(--space-5);
 }
 

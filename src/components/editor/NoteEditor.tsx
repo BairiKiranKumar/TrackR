@@ -10,6 +10,7 @@ import { MoneyDetector } from './MoneyDetector';
 import { moneyDetectionService } from '@/lib/services/MoneyDetectionService';
 import styles from './NoteEditor.module.css';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { format } from 'date-fns';
 
 interface NoteEditorProps {
@@ -20,6 +21,7 @@ interface NoteEditorProps {
 export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   const router = useRouter();
   const { items, refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const editorRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -207,7 +209,13 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
   const formattedDate = format(new Date(item.createdAt), 'MMMM d, yyyy');
 
   async function handleDeleteNote() {
-    if (!window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`)) return;
+    const confirmed = await confirm({
+      title: `Delete "${title || 'Untitled'}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     try {
       await dataService.deleteItem(item.id);
       await refreshItems();

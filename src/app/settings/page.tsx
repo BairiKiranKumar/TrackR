@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import {
   Moon, Sun, Cloud, RefreshCw,
   Download, Upload, ChevronRight, LogOut, Trash2,
-  Sparkles, ShieldCheck, CheckCircle2, AlertCircle, Settings2,
+  Package, ShieldCheck, CheckCircle2, AlertCircle, Settings2,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
+import { useToast } from '@/components/providers/ToastProvider';
 import { dataService } from '@/lib/services/DataService';
 import { storageModeService } from '@/lib/services/StorageModeService';
 import { StorageMode } from '@/types';
@@ -18,6 +20,8 @@ export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme, refreshItems } = useAppContext();
   const { user, userConfig, signOut } = useAuth();
+  const confirm = useConfirm();
+  const showToast = useToast();
   const [clearing, setClearing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [sampleLoading, setSampleLoading] = useState(false);
@@ -128,36 +132,33 @@ export default function SettingsPage() {
     try {
       const res = await dataService.loadSampleData();
       await refreshItems();
-      alert(`Loaded sample "YouTube Channel" dataset (${res.itemsCount} items, ${res.relationsCount} relations).`);
+      showToast(`Loaded sample "YouTube Channel" dataset (${res.itemsCount} items, ${res.relationsCount} relations).`, 'success');
     } catch (err) {
       console.error('Failed to load sample data', err);
-      alert('Failed to load sample dataset.');
+      showToast('Failed to load sample dataset.', 'error');
     } finally {
       setSampleLoading(false);
     }
   }
 
   async function handleClearAllData() {
-    const confirmed = window.confirm(
-      '⚠️ WARNING: Are you sure you want to clear ALL data?\n\nThis will permanently delete all tasks, notes, trackers, budgets, transactions, and links from both this device and Supabase. This action cannot be undone.'
-    );
+    const confirmed = await confirm({
+      title: 'Clear ALL data?',
+      message: 'This permanently deletes every task, note, tracker, budget, transaction, and link from both this device and your cloud storage. This cannot be undone.',
+      confirmLabel: 'Clear everything',
+      danger: true,
+      requirePhrase: 'CLEAR',
+    });
     if (!confirmed) return;
-    const doubleConfirmed = window.prompt(
-      'Type CLEAR to confirm wiping all data:'
-    );
-    if (doubleConfirmed !== 'CLEAR') {
-      alert('Clear cancelled: confirmation phrase did not match.');
-      return;
-    }
 
     setClearing(true);
     try {
       await dataService.clearAllData();
       await refreshItems();
-      alert('All data has been cleared.');
+      showToast('All data has been cleared.', 'success');
     } catch (err) {
       console.error('Clear error:', err);
-      alert('Failed to clear all data. Check console for details.');
+      showToast('Failed to clear all data. Check console for details.', 'error');
     } finally {
       setClearing(false);
     }
@@ -459,7 +460,7 @@ export default function SettingsPage() {
             disabled={sampleLoading}
             id="btn-load-sample-data"
           >
-            <Sparkles size={18} className={styles.settingIcon} />
+            <Package size={18} className={styles.settingIcon} />
             <div className={styles.settingInfo2}>
               <span className={styles.settingLabel}>
                 {sampleLoading ? 'Loading…' : 'Load Sample Project & Data'}

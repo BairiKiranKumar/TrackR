@@ -130,12 +130,19 @@
 .streakBadge {
   display: flex;
   align-items: center;
-  gap: 3px;
-  color: var(--color-warning);
+  gap: 4px;
+  color: var(--text-tertiary);
   font-size: var(--font-size-xs);
-  font-weight: 800;
-  margin-left: auto;
-  margin-right: var(--space-3);
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.streakBadge svg {
+  color: var(--color-warning);
+  opacity: 0.85;
 }
 
 @keyframes spin {

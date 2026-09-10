@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AppProvider } from '@/components/providers/AppProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { ConfirmDialogProvider } from '@/components/providers/ConfirmDialogProvider';
+import { ToastProvider } from '@/components/providers/ToastProvider';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { SideNav } from '@/components/layout/SideNav';
@@ -31,20 +33,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body>
-        <AuthProvider>
-          <AppProvider>
-            <AppHeader />
-            <GlobalShortcuts />
-            <WeeklyDigest />
-            <div id="app-root">
-              <SideNav />
-              <main className="app-main">
-                {children}
-              </main>
-              <BottomNav />
-            </div>
-          </AppProvider>
-        </AuthProvider>
+        <ToastProvider>
+          <ConfirmDialogProvider>
+            <AuthProvider>
+              <AppProvider>
+                <AppHeader />
+                <GlobalShortcuts />
+                <WeeklyDigest />
+                <div id="app-root">
+                  <SideNav />
+                  <main className="app-main">
+                    {children}
+                  </main>
+                  <BottomNav />
+                </div>
+              </AppProvider>
+            </AuthProvider>
+          </ConfirmDialogProvider>
+        </ToastProvider>
       </body>
     </html>
   );

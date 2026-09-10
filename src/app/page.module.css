@@ -55,10 +55,10 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 1.15rem;
-  border-radius: var(--radius-md, 10px);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.1));
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  margin-bottom: var(--space-6, 1.5rem);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  margin-bottom: var(--space-6);
 }
 
 .inboxBannerLeft {
@@ -71,13 +71,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
+  min-width: 26px;
+  height: 26px;
   padding: 0 6px;
-  border-radius: 999px;
-  background: var(--primary, #6366f1);
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
   color: #fff;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -99,18 +99,18 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.4rem 0.75rem;
-  border-radius: var(--radius-sm, 6px);
-  background: var(--primary, #6366f1);
+  border-radius: var(--radius-sm);
+  background: var(--accent-primary);
   color: #fff;
   font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
 .inboxBannerBtn:hover {
-  background: var(--primary-dark, #4f46e5);
+  background: var(--accent-secondary);
 }
 
 /* Projects Row */
@@ -125,13 +125,13 @@
   flex-direction: column;
   gap: 0.45rem;
   padding: 1rem;
-  border-radius: var(--radius-lg, 12px);
+  border-radius: var(--radius-md);
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-left-width: 3px;
   text-decoration: none;
   color: inherit;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .projectSpotlightCard:hover {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -16,9 +16,7 @@ import {
   FileText,
   DollarSign,
   TrendingUp,
-  Tag,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
 import {
@@ -26,20 +24,21 @@ import {
   ItemRelation,
   TrackerMetadata,
   TaskMetadata,
-  ProjectMetadata,
   ProjectContextSummary,
   RelationType,
-  ITEM_TYPE_EMOJIS,
   ITEM_TYPE_LABELS,
 } from '@/types';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import { format } from 'date-fns';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
+import { ItemTypeBadge, getItemTypeIcon } from '@/components/common/ItemTypeBadge';
 import styles from './page.module.css';
 
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const [item, setItem] = useState<Item | null>(null);
   const [backlinks, setBacklinks] = useState<{ relation: ItemRelation; item: Item }[]>([]);
   const [outgoing, setOutgoing] = useState<{ relation: ItemRelation; item: Item }[]>([]);
@@ -56,9 +55,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   // Quick task input for projects
   const [newProjectTask, setNewProjectTask] = useState('');
 
-  async function loadData() {
-    const { id } = await params;
-    if (id === 'new') {
+  const loadData = useCallback(async (targetId?: string) => {
+    const id = targetId || (await params).id;
+    if (!id || id === 'new') {
       router.push('/track');
       return;
     }
@@ -86,15 +85,26 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     }
 
     setLoading(false);
-  }
+  }, [params, router]);
 
   useEffect(() => {
-    loadData();
-  }, [params]);
+    let active = true;
+    params.then(({ id }) => {
+      if (active) loadData(id);
+    });
+    return () => {
+      active = false;
+    };
+  }, [params, loadData]);
 
   async function handleDelete() {
     if (!item) return;
-    const confirmed = window.confirm(`Are you sure you want to delete "${item.title}"?`);
+    const confirmed = await confirm({
+      title: `Delete "${item.title}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
     if (!confirmed) return;
     setDeleting(true);
     try {
@@ -199,9 +209,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         <button className="btn btn-icon btn-ghost" onClick={() => router.back()} id="btn-item-back">
           <ArrowLeft size={20} />
         </button>
-        <span className={styles.typeLabel}>
-          {ITEM_TYPE_EMOJIS[item.type]} {ITEM_TYPE_LABELS[item.type]}
-        </span>
+        <ItemTypeBadge type={item.type} />
         <button
           className="btn btn-icon btn-ghost"
           onClick={handleDelete}
@@ -404,7 +412,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   className={styles.refCard}
                   id={`link-ref-${ref.id}`}
                 >
-                  <span className={styles.refEmoji}>{ITEM_TYPE_EMOJIS[ref.type]}</span>
+                  <span className={styles.refEmoji}>{getItemTypeIcon(ref.type, 16)}</span>
                   <div className={styles.refInfo}>
                     <span className={styles.refTitle}>{ref.title}</span>
                     <span className={styles.refType}>
@@ -429,7 +437,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       {/* Backlinks — the knowledge graph magic */}
       <div className={styles.section}>
         <div className="section-header">
-          <span className="section-title">Incoming References & Backlinks</span>
+          <span className="section-title">Backlinks & Linked Context</span>
           <span className={styles.count}>{backlinks.length}</span>
         </div>
         {backlinks.length === 0 ? (
@@ -446,7 +454,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   className={styles.refCard}
                   id={`link-backlink-${src.id}`}
                 >
-                  <span className={styles.refEmoji}>{ITEM_TYPE_EMOJIS[src.type]}</span>
+                  <span className={styles.refEmoji}>{getItemTypeIcon(src.type, 16)}</span>
                   <div className={styles.refInfo}>
                     <span className={styles.refTitle}>{src.title}</span>
                     <span className={styles.refType}>
@@ -536,7 +544,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
                   >
                     <div className={styles.candidateInfo}>
                       <span className={styles.candidateEmoji}>
-                        {ITEM_TYPE_EMOJIS[candidate.type] || '📄'}
+                        {getItemTypeIcon(candidate.type, 16)}
                       </span>
                       <div className={styles.candidateTexts}>
                         <span className={styles.candidateTitle}>

@@ -10,17 +10,16 @@ import {
   CheckCircle2,
   FileText,
   DollarSign,
-  Target,
-  Sparkles,
+  Package,
   ArrowRight,
   TrendingUp,
   X,
   Clock,
-  Layers,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { dataService } from '@/lib/services/DataService';
 import { Item, ProjectContextSummary, ProjectMetadata } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
 import styles from './page.module.css';
 
 interface ProjectWithContext {
@@ -30,10 +29,9 @@ interface ProjectWithContext {
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const { items, refreshItems, isLoading } = useAppContext();
+  const { items, refreshItems } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [projectData, setProjectData] = useState<ProjectWithContext[]>([]);
-  const [loadingContexts, setLoadingContexts] = useState(true);
 
   // New project modal state
   const [showNewModal, setShowNewModal] = useState(false);
@@ -52,7 +50,6 @@ export default function ProjectsPage() {
   useEffect(() => {
     let isMounted = true;
     async function loadAllProjectContexts() {
-      setLoadingContexts(true);
       const results: ProjectWithContext[] = [];
       for (const p of projects) {
         try {
@@ -64,7 +61,6 @@ export default function ProjectsPage() {
       }
       if (isMounted) {
         setProjectData(results);
-        setLoadingContexts(false);
       }
     }
 
@@ -198,7 +194,7 @@ export default function ProjectsPage() {
                 className="btn btn-secondary"
                 onClick={handleLoadSample}
               >
-                <Sparkles size={16} />
+                <Package size={16} />
                 <span>Load Sample Project</span>
               </button>
             </div>
@@ -267,7 +263,7 @@ export default function ProjectsPage() {
                   <div className={styles.metricsRow}>
                     <div className={styles.metricItem} title={`${notesCount} linked notes`}>
                       <FileText size={13} className={styles.metricIcon} />
-                      <span>{notesCount} notes</span>
+                      <span>{notesCount} note{notesCount !== 1 ? 's' : ''}</span>
                     </div>
 
                     {expensesTotal > 0 && (
@@ -283,6 +279,11 @@ export default function ProjectsPage() {
                         <span>{trackersCount} tracker{trackersCount > 1 ? 's' : ''}</span>
                       </div>
                     )}
+
+                    <div className={styles.metricItem} title={`Last updated: ${new Date(project.updatedAt).toLocaleString()}`}>
+                      <Clock size={12} className={styles.metricIcon} />
+                      <span>{formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}</span>
+                    </div>
                   </div>
 
                   {/* Tags */}

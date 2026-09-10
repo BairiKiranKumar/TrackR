@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Circle,
   Clock,
-  Folder,
   FileText,
   DollarSign,
   Target,
@@ -156,7 +155,9 @@ function HomeDashboard() {
       {/* 1. TODAY */}
       <section className={styles.section}>
         <div className="section-header">
-          <span className="section-title">Today</span>
+          <span className="section-title">
+            Today {todayTasks.length > 0 ? `— ${todayTasks.filter(t => (t.metadata as TaskMetadata).status !== 'done').length} to move forward` : ''}
+          </span>
           <Link href="/track" className={styles.seeAll} id="link-home-tasks-all">
             See all <ChevronRight size={14} />
           </Link>
@@ -395,7 +396,7 @@ function MoneyCard({ label, amount, positive }: { label: string; amount: number;
   return (
     <div className={styles.moneyCard}>
       <span className={styles.moneyLabel}>{label}</span>
-      <span className={`${styles.moneyAmount} ${positive ? styles.positive : styles.negative}`}>
+      <span className={`financial-value ${styles.moneyAmount} ${positive ? styles.positive : styles.negative}`}>
         {formatAmount(Math.abs(amount))}
       </span>
     </div>

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2, Target, Folder } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2, Target, Folder, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { Item, TrackerMetadata, TaskMetadata } from '@/types';
 import { dataService } from '@/lib/services/DataService';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
@@ -12,9 +13,14 @@ import styles from './page.module.css';
 
 type Tab = 'tasks' | 'trackers' | 'goals' | 'projects';
 
-export default function TrackPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('tasks');
+function TrackContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as Tab | null;
+  const [userTab, setUserTab] = useState<Tab | null>(null);
+  const activeTab: Tab = userTab ?? (tabParam && ['tasks', 'trackers', 'goals', 'projects'].includes(tabParam) ? tabParam : 'tasks');
+  const setActiveTab = setUserTab;
   const { items, refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const router = useRouter();
 
   const tasks = items.filter(i => i.type === 'task');
@@ -37,7 +43,12 @@ export default function TrackPage() {
   async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
     e.stopPropagation();
-    const confirmed = window.confirm(`Are you sure you want to delete "${title || 'this item'}"?`);
+    const confirmed = await confirm({
+      title: `Delete "${title || 'this item'}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
     if (!confirmed) return;
     try {
       await dataService.deleteItem(id);
@@ -175,6 +186,8 @@ export default function TrackPage() {
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
+const DAY_GRID_PAGE_SIZE = 15;
+
 function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate: () => void; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = tracker.metadata as TrackerMetadata;
   const isSeries = meta.trackerType === 'series';
@@ -183,6 +196,15 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
   const total = meta.totalDays ?? 0;
   const pct = total > 0 ? (completed / total) * 100 : 0;
   const streak = meta.currentStreak ?? 0;
+
+  const dayPageCount = Math.max(1, Math.ceil(total / DAY_GRID_PAGE_SIZE));
+  // Open on whichever page of 15 contains the next day to complete, so a
+  // tracker that's already well underway doesn't dump you back at day 1.
+  const [dayPage, setDayPage] = useState(() =>
+    Math.min(Math.floor(completed / DAY_GRID_PAGE_SIZE), dayPageCount - 1)
+  );
+  const dayPageStart = dayPage * DAY_GRID_PAGE_SIZE;
+  const dayPageEnd = Math.min(dayPageStart + DAY_GRID_PAGE_SIZE, total);
 
   async function handleDayTap(dayIndex: number) {
     const completedDays = meta.completedDays ?? [];
@@ -245,28 +267,58 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
         </div>
       )}
 
-      {/* Day grid for series (first 10 days) */}
+      {/* Day grid for series, 15 days per page */}
       {isSeries && total > 0 && (
-        <div className="day-grid">
-          {Array.from({ length: Math.min(total, 15) }, (_, i) => {
-            const isCompleted = (meta.completedDays ?? []).includes(i);
-            const isToday = i === completed; // next day to complete
-            return (
+        <>
+          <div className="day-grid">
+            {Array.from({ length: dayPageEnd - dayPageStart }, (_, idx) => {
+              const i = dayPageStart + idx;
+              const isCompleted = (meta.completedDays ?? []).includes(i);
+              const isToday = i === completed; // next day to complete
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  className={`day-dot ${isCompleted ? 'day-dot--completed' : ''} ${isToday ? 'day-dot--today' : ''}`}
+                  onClick={() => handleDayTap(i)}
+                  style={isCompleted ? { background: meta.color ?? 'var(--accent-primary)', borderColor: meta.color ?? 'var(--accent-primary)' } : {}}
+                  title={`Day ${i + 1}`}
+                  id={`day-dot-${tracker.id}-${i}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+
+          {dayPageCount > 1 && (
+            <div className={styles.dayGridNav}>
               <button
-                key={i}
                 type="button"
-                className={`day-dot ${isCompleted ? 'day-dot--completed' : ''} ${isToday ? 'day-dot--today' : ''}`}
-                onClick={() => handleDayTap(i)}
-                style={isCompleted ? { background: meta.color ?? 'var(--accent-primary)', borderColor: meta.color ?? 'var(--accent-primary)' } : {}}
-                title={`Day ${i + 1}`}
-                id={`day-dot-${tracker.id}-${i}`}
+                className={styles.dayGridNavBtn}
+                onClick={() => setDayPage(p => Math.max(0, p - 1))}
+                disabled={dayPage === 0}
+                aria-label="Previous 15 days"
+                id={`btn-tracker-days-prev-${tracker.id}`}
               >
-                {i + 1}
+                <ChevronLeft size={14} />
               </button>
-            );
-          })}
-          {total > 15 && <span className={styles.moreDays}>+{total - 15}</span>}
-        </div>
+              <span className={styles.dayGridNavLabel}>
+                Days {dayPageStart + 1}–{dayPageEnd} of {total}
+              </span>
+              <button
+                type="button"
+                className={styles.dayGridNavBtn}
+                onClick={() => setDayPage(p => Math.min(dayPageCount - 1, p + 1))}
+                disabled={dayPage === dayPageCount - 1}
+                aria-label="Next 15 days"
+                id={`btn-tracker-days-next-${tracker.id}`}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Today button for streak */}
@@ -356,5 +408,13 @@ function ProjectCard({ project, onDelete }: { project: Item; onDelete?: (e: Reac
         </button>
       )}
     </div>
+  );
+}
+
+export default function TrackPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32, color: 'var(--text-tertiary)' }}>Loading…</div>}>
+      <TrackContent />
+    </Suspense>
   );
 }

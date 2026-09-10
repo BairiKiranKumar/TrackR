@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, Plus, Pin, BookOpen, FileText, Trash2, Edit3 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { Item } from '@/types';
 import { format } from 'date-fns';
 import { dataService } from '@/lib/services/DataService';
@@ -13,6 +14,7 @@ import styles from './page.module.css';
 export default function NotesPage() {
   const router = useRouter();
   const { items, refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const [query, setQuery] = useState('');
 
   const noteItems = items.filter(i => i.type === 'note' || i.type === 'journal');
@@ -41,7 +43,12 @@ export default function NotesPage() {
   async function handleDeleteNote(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
     e.stopPropagation();
-    const confirmed = window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`);
+    const confirmed = await confirm({
+      title: `Delete "${title || 'Untitled'}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
     if (!confirmed) return;
     try {
       await dataService.deleteItem(id);

@@ -2,17 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Inbox, Folder, Plus, Search } from 'lucide-react';
+import { LayoutDashboard, Inbox, Folder, Plus, Search } from 'lucide-react';
 import styles from './BottomNav.module.css';
 import { useState, useMemo } from 'react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { QuickAdd } from './QuickAdd';
 
 const NAV_ITEMS = [
-  { href: '/',         icon: Home,   label: 'Today',    id: 'nav-home' },
-  { href: '/inbox',    icon: Inbox,  label: 'Inbox',    id: 'nav-inbox', hasBadge: true },
-  { href: '/projects', icon: Folder, label: 'Projects', id: 'nav-projects' },
-  { href: '/search',   icon: Search, label: 'Search',   id: 'nav-search' },
+  { href: '/',         icon: LayoutDashboard, label: 'Overview', id: 'nav-home' },
+  { href: '/inbox',    icon: Inbox,           label: 'Inbox',    id: 'nav-inbox', hasBadge: true },
+  { href: '/projects', icon: Folder,          label: 'Projects', id: 'nav-projects' },
+  { href: '/search',   icon: Search,          label: 'Search',   id: 'nav-search' },
 ];
 
 export function BottomNav() {

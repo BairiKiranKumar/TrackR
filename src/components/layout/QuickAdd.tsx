@@ -6,40 +6,19 @@ import {
   X,
   FileText,
   CheckSquare,
-  Target,
   DollarSign,
-  TrendingUp,
-  BookOpen,
   Folder,
-  Flame,
   Inbox,
-  Sparkles,
   ArrowRight,
   Tag,
 } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
 import { useAppContext } from '@/components/providers/AppProvider';
-import { Item, ItemType, ITEM_TYPE_LABELS, ITEM_TYPE_EMOJIS, InboxMetadata, CaptureResult } from '@/types';
+import { Item, ItemType, InboxMetadata, CaptureResult } from '@/types';
 import { localCaptureProcessor } from '@/lib/services/CaptureService';
 import { TransactionForm } from '@/components/money/TransactionForm';
+import { ItemTypeBadge } from '@/components/common/ItemTypeBadge';
 import styles from './QuickAdd.module.css';
-
-const QUICK_ITEMS: {
-  type: ItemType;
-  label: string;
-  icon: React.ComponentType<{ size?: number }>;
-  color: string;
-  bg: string;
-}[] = [
-  { type: 'note', label: 'Note', icon: FileText, color: 'var(--color-note)', bg: 'rgba(96,165,250,0.12)' },
-  { type: 'task', label: 'Task', icon: CheckSquare, color: 'var(--color-task)', bg: 'rgba(52,211,153,0.12)' },
-  { type: 'tracker', label: 'Tracker', icon: Target, color: 'var(--color-tracker)', bg: 'rgba(167,139,250,0.12)' },
-  { type: 'journal', label: 'Journal', icon: BookOpen, color: 'var(--color-journal)', bg: 'rgba(147,197,253,0.12)' },
-  { type: 'expense', label: 'Expense', icon: DollarSign, color: 'var(--color-expense)', bg: 'rgba(248,113,113,0.12)' },
-  { type: 'income', label: 'Income', icon: TrendingUp, color: 'var(--color-income)', bg: 'rgba(52,211,153,0.12)' },
-  { type: 'project', label: 'Project', icon: Folder, color: 'var(--color-project)', bg: 'rgba(245,158,11,0.12)' },
-  { type: 'habit', label: 'Habit', icon: Flame, color: 'var(--color-habit)', bg: 'rgba(251,146,60,0.12)' },
-];
 
 interface QuickAddProps {
   onClose: () => void;
@@ -61,19 +40,14 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
   }, [items]);
 
   // Real-time deterministic detection
-  const [detectedType, setDetectedType] = useState<ItemType>('note');
+  const [detectedType, setDetectedType] = useState<ItemType>(initialType || 'note');
   const [detectedTags, setDetectedTags] = useState<string[]>([]);
   const [detectedProject, setDetectedProject] = useState<Item | null>(null);
 
   useEffect(() => {
-    let active = true;
-    if (!rawText.trim()) {
-      setDetectedType(initialType || 'note');
-      setDetectedTags([]);
-      setDetectedProject(null);
-      return;
-    }
+    if (!rawText.trim()) return;
 
+    let active = true;
     localCaptureProcessor.process(rawText, projects).then((res: CaptureResult) => {
       if (!active) return;
       setDetectedType(res.type);
@@ -89,7 +63,17 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
     return () => {
       active = false;
     };
-  }, [rawText, projects, initialType]);
+  }, [rawText, projects]);
+
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    setRawText(val);
+    if (!val.trim()) {
+      setDetectedType(initialType || 'note');
+      setDetectedTags([]);
+      setDetectedProject(null);
+    }
+  }
 
   async function handleQuickCapture(toInbox = true) {
     if (!rawText.trim()) return;
@@ -195,7 +179,7 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
                 className={styles.captureTextarea}
                 placeholder="What's on your mind? Capture anything..."
                 value={rawText}
-                onChange={e => setRawText(e.target.value)}
+                onChange={handleInputChange}
                 rows={3}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -209,10 +193,7 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
               {/* Real-time Detection Bar */}
               {rawText.trim() && (
                 <div className={styles.detectionRow}>
-                  <span className={styles.detectedBadge}>
-                    <span>{ITEM_TYPE_EMOJIS[detectedType]}</span>
-                    <span>{ITEM_TYPE_LABELS[detectedType]}</span>
-                  </span>
+                  <ItemTypeBadge type={detectedType} size="sm" />
 
                   {detectedProject && (
                     <span className={styles.detectedProject}>

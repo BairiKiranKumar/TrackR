@@ -192,11 +192,44 @@
   text-align: right;
 }
 
-.moreDays {
-  font-size: 11px;
-  color: var(--text-tertiary);
+.dayGridNav {
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.dayGridNavBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dayGridNavBtn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.dayGridNavBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dayGridNavLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 .streakTodayBtn {

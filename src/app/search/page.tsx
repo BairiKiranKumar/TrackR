@@ -5,7 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search as SearchIcon, X } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
-import { Item, ITEM_TYPE_EMOJIS, ITEM_TYPE_LABELS } from '@/types';
+import { Item, ITEM_TYPE_LABELS } from '@/types';
+import { ItemTypeBadge } from '@/components/common/ItemTypeBadge';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import styles from './page.module.css';
 
 function SearchContent() {
@@ -32,7 +34,7 @@ function SearchContent() {
   // Group results by type
   const grouped = groupByType(results);
 
-  const GROUP_ORDER = ['tracker', 'habit', 'note', 'journal', 'task', 'expense', 'income', 'goal', 'project', 'budget'] as const;
+  const GROUP_ORDER = ['project', 'task', 'note', 'expense', 'income', 'tracker', 'goal', 'habit', 'journal', 'budget'] as const;
 
   function getHref(item: Item): string {
     if (item.type === 'note' || item.type === 'journal') return `/notes/${item.id}`;
@@ -124,13 +126,18 @@ function SearchContent() {
                       className={styles.resultCard}
                       id={`link-result-${item.id}`}
                     >
-                      <span className={styles.typeBadge}>
-                        {ITEM_TYPE_LABELS[item.type]?.toUpperCase() || item.type.toUpperCase()}
-                      </span>
+                      <ItemTypeBadge type={item.type} size="sm" />
                       <div className={styles.resultInfo}>
-                        <span className={styles.resultTitle}>
-                          <Highlight text={item.title} query={query} />
-                        </span>
+                        <div className={styles.resultTitleRow}>
+                          <span className={styles.resultTitle}>
+                            <Highlight text={item.title} query={query} />
+                          </span>
+                          {(item.type === 'expense' || item.type === 'income') && (item.metadata as { amount?: number })?.amount != null && (
+                            <span className={`financial-value ${item.type === 'income' ? styles.incomeAmount : styles.expenseAmount}`}>
+                              {item.type === 'income' ? '+' : '-'}{formatAmount((item.metadata as { amount: number }).amount)}
+                            </span>
+                          )}
+                        </div>
                         {item.content && (
                           <span className={styles.resultSnippet}>
                             <Highlight text={getSnippet(item.content, query)} query={query} />

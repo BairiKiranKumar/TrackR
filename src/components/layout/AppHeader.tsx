@@ -129,14 +129,14 @@ export function AppHeader() {
         )}
       </div>
 
-      {dailyStreak && (
-        <div className={styles.streakBadge} aria-label={`${dailyStreak.currentStreak}-day app streak`}>
-          <Flame size={14} aria-hidden="true" />
-          <span>{dailyStreak.currentStreak}</span>
-        </div>
-      )}
-
       <div className={styles.rightActions} ref={menuRef}>
+        {dailyStreak && (
+          <div className={styles.streakBadge} aria-label={`${dailyStreak.currentStreak}-day app streak`}>
+            <Flame size={13} aria-hidden="true" />
+            <span>{dailyStreak.currentStreak}</span>
+          </div>
+        )}
+
         <div className={styles.notificationsWrap}>
           <button
             className={styles.bellBtn}

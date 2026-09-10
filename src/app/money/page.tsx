@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, Plus, TrendingUp, TrendingDown, Trash2, DollarSign, Target } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { BudgetProgress, Item, TransactionCategory, TransactionMetadata, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/types';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import { dataService } from '@/lib/services/DataService';
@@ -13,9 +15,14 @@ import { TransactionForm } from '@/components/money/TransactionForm';
 
 type Tab = 'overview' | 'transactions' | 'goals';
 
-export default function MoneyPage() {
+function MoneyContent() {
   const { items, refreshItems } = useAppContext();
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const confirm = useConfirm();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as Tab | null;
+  const [userTab, setUserTab] = useState<Tab | null>(null);
+  const activeTab: Tab = userTab ?? (tabParam && ['overview', 'transactions', 'goals'].includes(tabParam) ? tabParam : 'overview');
+  const setActiveTab = setUserTab;
   const [totals, setTotals] = useState({ income: 0, expenses: 0, net: 0 });
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
@@ -41,7 +48,12 @@ export default function MoneyPage() {
   async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
     e.stopPropagation();
-    const confirmed = window.confirm(`Are you sure you want to delete "${title || 'this item'}"?`);
+    const confirmed = await confirm({
+      title: `Delete "${title || 'this item'}"?`,
+      message: 'This can’t be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
     if (!confirmed) return;
     try {
       await dataService.deleteItem(id);
@@ -451,5 +463,13 @@ function CategoryBreakdown({ transactions, type }: { transactions: Item[]; type:
         })}
       </div>
     </div>
+  );
+}
+
+export default function MoneyPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 32, color: 'var(--text-tertiary)' }}>Loading…</div>}>
+      <MoneyContent />
+    </Suspense>
   );
 }

@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Inbox,
   CheckCircle2,
@@ -10,20 +9,18 @@ import {
   Tag,
   ArrowRight,
   Trash2,
-  Filter,
   Search,
-  Sparkles,
   Link2,
   ExternalLink,
-  Layers,
-  Calendar,
   X,
   Plus,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
+import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { dataService } from '@/lib/services/DataService';
-import { Item, ItemType, ITEM_TYPE_LABELS, ITEM_TYPE_EMOJIS, InboxMetadata, RelationType } from '@/types';
+import { Item, ItemType, ITEM_TYPE_LABELS, InboxMetadata, RelationType } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
+import { ItemTypeBadge, getItemTypeIcon } from '@/components/common/ItemTypeBadge';
 import styles from './page.module.css';
 
 const CONVERTIBLE_TYPES: ItemType[] = [
@@ -37,8 +34,8 @@ const CONVERTIBLE_TYPES: ItemType[] = [
 ];
 
 export default function InboxPage() {
-  const router = useRouter();
-  const { items, refreshItems, isLoading } = useAppContext();
+  const { items, refreshItems } = useAppContext();
+  const confirm = useConfirm();
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -137,7 +134,13 @@ export default function InboxPage() {
   }
 
   async function handleDeleteItem(id: string, title: string) {
-    if (!window.confirm(`Delete "${title || 'Untitled'}" from Inbox?`)) return;
+    const confirmed = await confirm({
+      title: `Delete "${title || 'Untitled'}"?`,
+      message: 'This removes it from your Inbox permanently.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) return;
     setProcessingId(id);
     try {
       await dataService.deleteItem(id);
@@ -282,9 +285,7 @@ export default function InboxPage() {
                   {/* Card Header */}
                   <div className={styles.cardHeader}>
                     <div className={styles.cardMetaRow}>
-                      <span className={styles.typeBadge}>
-                        <span className={styles.typeText}>{ITEM_TYPE_LABELS[item.type]?.toUpperCase() || item.type.toUpperCase()}</span>
-                      </span>
+                      <ItemTypeBadge type={item.type} size="sm" />
 
                       {assignedProject && (
                         <span className={styles.projectBadge}>
@@ -350,7 +351,7 @@ export default function InboxPage() {
                         >
                           {CONVERTIBLE_TYPES.map(t => (
                             <option key={t} value={t}>
-                              {ITEM_TYPE_EMOJIS[t]} {ITEM_TYPE_LABELS[t]}
+                              {ITEM_TYPE_LABELS[t]}
                             </option>
                           ))}
                         </select>
@@ -476,7 +477,7 @@ export default function InboxPage() {
                   >
                     <div className={styles.candidateInfo}>
                       <span className={styles.candidateEmoji}>
-                        {ITEM_TYPE_EMOJIS[candidate.type] || '📄'}
+                        {getItemTypeIcon(candidate.type, 15)}
                       </span>
                       <div className={styles.candidateTexts}>
                         <span className={styles.candidateTitle}>
