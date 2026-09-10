@@ -221,7 +221,6 @@ export default function InboxPage() {
                   className={`${styles.filterPill} ${filterType === type ? styles.filterPillActive : ''}`}
                   onClick={() => setFilterType(type)}
                 >
-                  <span>{ITEM_TYPE_EMOJIS[type]}</span>
                   <span>{ITEM_TYPE_LABELS[type]}</span>
                   <span className={styles.pillCount}>{count}</span>
                 </button>
@@ -236,14 +235,14 @@ export default function InboxPage() {
         {filteredItems.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>
-              <Sparkles size={48} className={styles.sparkleIcon} />
+              <CheckCircle2 size={40} className={styles.checkIcon} />
             </div>
             <h2 className={styles.emptyTitle}>
-              {inboxItems.length === 0 ? 'Inbox Zero' : 'No matching items'}
+              {inboxItems.length === 0 ? 'Nothing waiting to be organized' : 'No matching items'}
             </h2>
             <p className={styles.emptySubtitle}>
               {inboxItems.length === 0
-                ? 'All captured thoughts, tasks, and notes have been triaged into your workspace.'
+                ? "You're all caught up. Every capture has been triaged into your workspace."
                 : 'No inbox items match your current filter and search query.'}
             </p>
             {inboxItems.length === 0 && (
@@ -284,8 +283,7 @@ export default function InboxPage() {
                   <div className={styles.cardHeader}>
                     <div className={styles.cardMetaRow}>
                       <span className={styles.typeBadge}>
-                        <span className={styles.typeEmoji}>{ITEM_TYPE_EMOJIS[item.type] || '📄'}</span>
-                        <span className={styles.typeText}>{ITEM_TYPE_LABELS[item.type] || item.type}</span>
+                        <span className={styles.typeText}>{ITEM_TYPE_LABELS[item.type]?.toUpperCase() || item.type.toUpperCase()}</span>
                       </span>
 
                       {assignedProject && (
@@ -411,7 +409,14 @@ export default function InboxPage() {
       {/* Link Modal */}
       {linkingItem && (
         <div className={styles.modalOverlay} onClick={() => setLinkingItem(null)}>
-          <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+          <div
+            className={styles.modalBox}
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Connect context"
+            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setLinkingItem(null); } }}
+          >
             <div className={styles.modalHeader}>
               <div className={styles.modalTitleRow}>
                 <Link2 size={18} className={styles.modalTitleIcon} />

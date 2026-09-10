@@ -116,27 +116,29 @@
 /* Projects Row */
 .projectsRow {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 0.85rem;
 }
 
 .projectSpotlightCard {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.95rem;
-  border-radius: var(--radius-md, 10px);
+  gap: 0.45rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg, 12px);
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
+  border-left-width: 3px;
   text-decoration: none;
   color: inherit;
   transition: all 0.15s ease;
 }
 
 .projectSpotlightCard:hover {
-  border-color: var(--border-color);
+  border-color: var(--border-default);
+  border-left-color: inherit;
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .projSpotlightTop {
@@ -145,12 +147,8 @@
   gap: 0.45rem;
 }
 
-.projSpotlightEmoji {
-  font-size: 1.1rem;
-}
-
 .projSpotlightTitle {
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -167,6 +165,68 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.projBadgesRow {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.projBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+}
+
+.emptyTasks {
+  padding: 0.95rem 1.15rem;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md, 8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.emptyTasks p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.emptyTasksLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.activityIconWrap,
+.trackerIconWrap,
+.noteIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .streakCard {

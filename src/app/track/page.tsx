@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2 } from 'lucide-react';
+import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2, Target, Folder } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { Item, TrackerMetadata, TaskMetadata } from '@/types';
 import { dataService } from '@/lib/services/DataService';
-import { formatAmount } from '@/lib/services/MoneyParser';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import styles from './page.module.css';
 
 type Tab = 'tasks' | 'trackers' | 'goals' | 'projects';
@@ -37,9 +37,14 @@ export default function TrackPage() {
   async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
-    await dataService.deleteItem(id);
-    await refreshItems();
+    const confirmed = window.confirm(`Are you sure you want to delete "${title || 'this item'}"?`);
+    if (!confirmed) return;
+    try {
+      await dataService.deleteItem(id);
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+    }
   }
 
   return (
@@ -87,6 +92,7 @@ export default function TrackPage() {
             return (
               <div key={task.id} className={`${styles.taskRow} ${isDone ? styles.taskDone : ''}`}>
                 <button
+                  type="button"
                   className={styles.checkBtn}
                   onClick={() => !isDone && handleCompleteTask(task.id)}
                   id={`btn-complete-${task.id}`}
@@ -105,6 +111,7 @@ export default function TrackPage() {
                 </Link>
                 {meta.priority === 'high' && <span className="badge badge-danger">!</span>}
                 <button
+                  type="button"
                   className="btn btn-icon btn-ghost"
                   onClick={(e) => handleDeleteItem(e, task.id, task.title)}
                   id={`btn-delete-task-${task.id}`}
@@ -124,7 +131,7 @@ export default function TrackPage() {
         <div className={styles.list}>
           {trackers.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state__icon">🎯</span>
+              <span className="empty-state__icon"><Target size={36} /></span>
               <span className="empty-state__title">No trackers yet</span>
               <span className="empty-state__subtitle">Create a series, streak, or habit tracker to stay consistent.</span>
             </div>
@@ -140,7 +147,7 @@ export default function TrackPage() {
         <div className={styles.list}>
           {goals.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state__icon">⭐</span>
+              <span className="empty-state__icon"><Star size={36} /></span>
               <span className="empty-state__title">No goals yet</span>
               <span className="empty-state__subtitle">Set targets and track your progress toward them.</span>
             </div>
@@ -154,7 +161,7 @@ export default function TrackPage() {
         <div className={styles.list}>
           {projects.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state__icon">📁</span>
+              <span className="empty-state__icon"><Folder size={36} /></span>
               <span className="empty-state__title">No projects yet</span>
               <span className="empty-state__subtitle">Projects are containers. Use @references to connect notes, tasks, and money to them.</span>
             </div>
@@ -193,28 +200,32 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
   }
 
   return (
-    <Link href={`/track/${tracker.id}`} className={styles.trackerCard} id={`link-tracker-${tracker.id}`}>
+    <div className={styles.trackerCard} id={`tracker-card-${tracker.id}`}>
       <div className={styles.trackerHeader}>
-        <span className={styles.trackerEmoji}>{meta.emoji ?? (isStreak ? '🔥' : '🎯')}</span>
-        <div className={styles.trackerMeta}>
-          <span className={styles.trackerName}>{tracker.title}</span>
-          <div className={styles.trackerStats}>
-            {streak > 0 && (
-              <span className="streak-badge">
-                <span className="streak-fire">🔥</span> {streak} day streak
-              </span>
-            )}
-            {isSeries && total > 0 && (
-              <span className={styles.trackerStat}>{completed}/{total} days</span>
-            )}
+        <Link href={`/track/${tracker.id}`} className={styles.trackerMainLink} id={`link-tracker-${tracker.id}`}>
+          <span className={styles.trackerEmoji}>{meta.emoji ?? (isStreak ? '🔥' : '🎯')}</span>
+          <div className={styles.trackerMeta}>
+            <span className={styles.trackerName}>{tracker.title}</span>
+            <div className={styles.trackerStats}>
+              {streak > 0 && (
+                <span className="streak-badge">
+                  <span className="streak-fire">🔥</span> {streak} day streak
+                </span>
+              )}
+              {isSeries && total > 0 && (
+                <span className={styles.trackerStat}>{completed}/{total} days</span>
+              )}
+            </div>
           </div>
-        </div>
+        </Link>
         {onDelete && (
           <button
+            type="button"
             className="btn btn-icon btn-ghost"
             onClick={onDelete}
+            id={`btn-delete-tracker-${tracker.id}`}
             title="Delete tracker"
-            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4 }}
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
           >
             <Trash2 size={16} />
           </button>
@@ -236,15 +247,16 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
 
       {/* Day grid for series (first 10 days) */}
       {isSeries && total > 0 && (
-        <div className="day-grid" onClick={e => e.preventDefault()}>
+        <div className="day-grid">
           {Array.from({ length: Math.min(total, 15) }, (_, i) => {
             const isCompleted = (meta.completedDays ?? []).includes(i);
             const isToday = i === completed; // next day to complete
             return (
               <button
                 key={i}
+                type="button"
                 className={`day-dot ${isCompleted ? 'day-dot--completed' : ''} ${isToday ? 'day-dot--today' : ''}`}
-                onClick={(e) => { e.preventDefault(); handleDayTap(i); }}
+                onClick={() => handleDayTap(i)}
                 style={isCompleted ? { background: meta.color ?? 'var(--accent-primary)', borderColor: meta.color ?? 'var(--accent-primary)' } : {}}
                 title={`Day ${i + 1}`}
                 id={`day-dot-${tracker.id}-${i}`}
@@ -260,15 +272,16 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
       {/* Today button for streak */}
       {isStreak && (
         <button
+          type="button"
           className={styles.streakTodayBtn}
-          onClick={(e) => { e.preventDefault(); handleStreakTap(); }}
+          onClick={() => handleStreakTap()}
           id={`btn-streak-today-${tracker.id}`}
           style={{ background: (meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]) ? 'var(--color-success)' : meta.color ?? 'var(--accent-primary)' }}
         >
           {(meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]) ? '✅ Done today' : '✓ Mark today'}
         </button>
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -279,59 +292,69 @@ function GoalCard({ goal, onDelete }: { goal: Item; onDelete?: (e: React.MouseEv
   const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
 
   return (
-    <Link href={`/track/${goal.id}`} className={styles.goalCard} id={`link-goal-${goal.id}`}>
+    <div className={styles.goalCard} id={`goal-card-${goal.id}`}>
       <div className={styles.goalHeader}>
-        <Star size={18} color="var(--color-goal)" />
-        <span className={styles.goalName}>{goal.title}</span>
-        <span className={styles.goalPct}>{Math.round(pct)}%</span>
+        <Link href={`/track/${goal.id}`} className={styles.goalLink} id={`link-goal-${goal.id}`}>
+          <Star size={18} color="var(--color-goal)" />
+          <span className={styles.goalName}>{goal.title}</span>
+          <span className={styles.goalPct}>{Math.round(pct)}%</span>
+        </Link>
         {onDelete && (
           <button
+            type="button"
             className="btn btn-icon btn-ghost"
             onClick={onDelete}
+            id={`btn-delete-goal-${goal.id}`}
             title="Delete goal"
-            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4 }}
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
           >
             <Trash2 size={16} />
           </button>
         )}
       </div>
-      <div className="progress-track" style={{ marginTop: 8 }}>
-        <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
-      </div>
-      <div className={styles.goalAmounts}>
-        <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
-        <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
-      </div>
-    </Link>
+      <Link href={`/track/${goal.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+        <div className="progress-track" style={{ marginTop: 8 }}>
+          <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
+        </div>
+        <div className={styles.goalAmounts}>
+          <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
+          <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
+        </div>
+      </Link>
+    </div>
   );
 }
 
 function ProjectCard({ project, onDelete }: { project: Item; onDelete?: (e: React.MouseEvent) => void }) {
   const meta = project.metadata as { emoji?: string; color?: string; status?: string };
   return (
-    <Link href={`/track/${project.id}`} className={styles.projectCard} id={`link-project-${project.id}`}>
-      <span className={styles.projectEmoji}>{meta.emoji ?? '📁'}</span>
-      <div className={styles.projectInfo}>
-        <span className={styles.projectName}>{project.title}</span>
-        {project.content && (
-          <span className={styles.projectDesc}>{project.content.slice(0, 60)}</span>
+    <div className={styles.projectCard} id={`project-card-${project.id}`}>
+      <Link href={`/track/${project.id}`} className={styles.projectMainLink} id={`link-project-${project.id}`}>
+        <span className={styles.projectEmoji}>{meta.emoji ?? '📁'}</span>
+        <div className={styles.projectInfo}>
+          <span className={styles.projectName}>{project.title}</span>
+          {project.content && (
+            <span className={styles.projectDesc}>{project.content.slice(0, 60)}</span>
+          )}
+        </div>
+        {meta.status && (
+          <span className={`badge ${meta.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
+            {meta.status}
+          </span>
         )}
-      </div>
-      {meta.status && (
-        <span className={`badge ${meta.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
-          {meta.status}
-        </span>
-      )}
+      </Link>
       {onDelete && (
         <button
+          type="button"
           className="btn btn-icon btn-ghost"
           onClick={onDelete}
+          id={`btn-delete-project-${project.id}`}
           title="Delete project"
-          style={{ color: 'var(--text-tertiary)', marginLeft: 8, padding: 4 }}
+          style={{ color: 'var(--text-tertiary)', marginLeft: 8, padding: 4, flexShrink: 0 }}
         >
           <Trash2 size={16} />
         </button>
       )}
-    </Link>
+    </div>
   );
 }

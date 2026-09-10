@@ -3,12 +3,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { ChevronRight, Flame, Zap, CheckCircle2, Circle } from 'lucide-react';
+import {
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Folder,
+  FileText,
+  DollarSign,
+  Target,
+  PlusCircle,
+  Edit3,
+  ArrowRight,
+} from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Item, TrackerMetadata, TaskMetadata } from '@/types';
-import { formatAmount } from '@/lib/services/MoneyParser';
+import { Item, TrackerMetadata, TaskMetadata, ProjectMetadata, ProjectContextSummary } from '@/types';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import LandingPage from './landing';
 import styles from './page.module.css';
 
@@ -19,7 +31,7 @@ export default function RootPage() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className={styles.loading}><div className="skeleton" style={{ width: '100%', height: 200, borderRadius: 16 }} /></div>;
+    return <div className={styles.loading}><div className="skeleton" style={{ width: '100%', height: 200, borderRadius: 12 }} /></div>;
   }
 
   if (!user) {
@@ -30,21 +42,22 @@ export default function RootPage() {
 }
 
 function HomeDashboard() {
-  const { items, refreshItems, isReady, dailyStreak } = useAppContext();
+  const { items, refreshItems, isReady } = useAppContext();
   const [todayTasks, setTodayTasks] = useState<Item[]>([]);
   const [monthlyTotals, setMonthlyTotals] = useState({ income: 0, expenses: 0, net: 0 });
-  const [recentActivity, setRecentActivity] = useState<{ id: string; description: string; emoji: string; time: string }[]>([]);
+  const [projectContexts, setProjectContexts] = useState<Record<string, ProjectContextSummary | null>>({});
+  const [recentActivity, setRecentActivity] = useState<{ id: string; description: string; type: string; time: string }[]>([]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const activeTrackers = useMemo(
-    () => items.filter(i => i.type === 'tracker' && !i.archived).slice(0, 3),
+  const activeProjects = useMemo(
+    () => items.filter(i => i.type === 'project' && !i.archived).slice(0, 4),
     [items]
   );
 
-  const activeProjects = useMemo(
-    () => items.filter(i => i.type === 'project' && !i.archived).slice(0, 3),
+  const activeTrackers = useMemo(
+    () => items.filter(i => i.type === 'tracker' && !i.archived).slice(0, 3),
     [items]
   );
 
@@ -62,12 +75,6 @@ function HomeDashboard() {
     [items]
   );
 
-  const isMilestone = Boolean(
-    dailyStreak &&
-    dailyStreak.milestoneReachedOn === dailyStreak.lastOpenedDate &&
-    dailyStreak.milestoneReached
-  );
-
   useEffect(() => {
     if (!isReady) return;
     let active = true;
@@ -82,18 +89,33 @@ function HomeDashboard() {
       setTodayTasks(tasks.slice(0, 5));
       setMonthlyTotals(totals);
 
-      const actItems = activity.slice(0, 5).map(a => ({
+      const actItems = activity.slice(0, 6).map(a => ({
         id: a.id,
         description: a.description ?? a.itemTitle,
-        emoji: getActivityEmoji(a.type),
+        type: a.type,
         time: format(new Date(a.createdAt), 'h:mm a'),
       }));
       setRecentActivity(actItems);
+
+      // Load project contexts for active projects
+      const contexts: Record<string, ProjectContextSummary | null> = {};
+      await Promise.all(
+        activeProjects.map(async (p) => {
+          try {
+            contexts[p.id] = await dataService.getProjectContext(p.id);
+          } catch {
+            contexts[p.id] = null;
+          }
+        })
+      );
+      if (active) {
+        setProjectContexts(contexts);
+      }
     }
 
     load();
     return () => { active = false; };
-  }, [isReady, items]);
+  }, [isReady, items, activeProjects]);
 
   async function handleCompleteTask(taskId: string) {
     await dataService.completeTask(taskId);
@@ -101,18 +123,17 @@ function HomeDashboard() {
   }
 
   if (!isReady) {
-    return <div className={styles.loading}><div className="skeleton" style={{ width: '100%', height: 200, borderRadius: 16 }} /></div>;
+    return <div className={styles.loading}><div className="skeleton" style={{ width: '100%', height: 200, borderRadius: 12 }} /></div>;
   }
 
   return (
     <div className={styles.page}>
-      {/* Greeting */}
+      {/* Calm Greeting */}
       <div className={styles.greeting}>
         <div>
-          <h1 className={styles.greetingText}>{greeting} 👋</h1>
+          <h1 className={styles.greetingText}>{greeting}</h1>
           <p className={styles.greetingDate}>{format(new Date(), 'EEEE, MMMM d')}</p>
         </div>
-        <Zap size={22} className={styles.zapIcon} />
       </div>
 
       {/* Inbox Triage Prompt */}
@@ -132,81 +153,22 @@ function HomeDashboard() {
         </div>
       )}
 
-      {dailyStreak && (
-        <section className={`${styles.streakCard} ${isMilestone ? styles.streakMilestone : ''}`}>
-          {isMilestone && (
-            <div className={styles.confettiWrap} aria-hidden="true">
-              <span className={`${styles.confettiPiece} ${styles.c1}`}>✦</span>
-              <span className={`${styles.confettiPiece} ${styles.c2}`}>🎉</span>
-              <span className={`${styles.confettiPiece} ${styles.c3}`}>★</span>
-              <span className={`${styles.confettiPiece} ${styles.c4}`}>✨</span>
-              <span className={`${styles.confettiPiece} ${styles.c5}`}>◆</span>
-              <span className={`${styles.confettiPiece} ${styles.c6}`}>🎈</span>
-            </div>
-          )}
-          <div className={`${styles.streakIcon} ${isMilestone ? styles.streakIconCelebration : ''}`}>
-            <Flame size={20} />
-          </div>
-          <div className={styles.streakContent}>
-            <div className={styles.streakHeader}>
-              <strong>{dailyStreak.currentStreak}-day app streak</strong>
-              {isMilestone && (
-                <span className={styles.milestoneBadge}>
-                  {dailyStreak.milestoneReached} DAYS!
-                </span>
-              )}
-            </div>
-            {dailyStreak.endedOn === dailyStreak.lastOpenedDate && dailyStreak.endedStreak ? (
-              <p>Your {dailyStreak.endedStreak}-day streak ended — start a new one today.</p>
-            ) : isMilestone ? (
-              <p>🎉 Milestone unlocked! You reached {dailyStreak.milestoneReached} consecutive days.</p>
-            ) : (
-              <p>Open TRACKR each day to keep it going.</p>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Active Projects Spotlight */}
-      {activeProjects.length > 0 && (
-        <section className={styles.section}>
-          <div className="section-header">
-            <span className="section-title">Projects</span>
-            <Link href="/projects" className={styles.seeAll} id="link-home-projects-all">
-              See all <ChevronRight size={14} />
+      {/* 1. TODAY */}
+      <section className={styles.section}>
+        <div className="section-header">
+          <span className="section-title">Today</span>
+          <Link href="/track" className={styles.seeAll} id="link-home-tasks-all">
+            See all <ChevronRight size={14} />
+          </Link>
+        </div>
+        {todayTasks.length === 0 ? (
+          <div className={styles.emptyTasks}>
+            <p>No tasks scheduled for today.</p>
+            <Link href="/track" className={styles.emptyTasksLink}>
+              View all tasks <ArrowRight size={13} />
             </Link>
           </div>
-          <div className={styles.projectsRow}>
-            {activeProjects.map(proj => (
-              <Link
-                key={proj.id}
-                href={`/track/${proj.id}`}
-                className={styles.projectSpotlightCard}
-              >
-                <div className={styles.projSpotlightTop}>
-                  <span className={styles.projSpotlightEmoji}>
-                    {(proj.metadata as Record<string, unknown>)?.emoji as string || '📁'}
-                  </span>
-                  <span className={styles.projSpotlightTitle}>{proj.title}</span>
-                </div>
-                {proj.content && (
-                  <p className={styles.projSpotlightDesc}>{proj.content}</p>
-                )}
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Today's Tasks */}
-      {todayTasks.length > 0 && (
-        <section className={styles.section}>
-          <div className="section-header">
-            <span className="section-title">Today</span>
-            <Link href="/track" className={styles.seeAll} id="link-home-tasks-all">
-              See all <ChevronRight size={14} />
-            </Link>
-          </div>
+        ) : (
           <div className={styles.taskList}>
             {todayTasks.map(task => {
               const meta = task.metadata as TaskMetadata;
@@ -219,8 +181,8 @@ function HomeDashboard() {
                     aria-label="Complete task"
                   >
                     {meta.status === 'done'
-                      ? <CheckCircle2 size={20} className={styles.checkDone} />
-                      : <Circle size={20} className={styles.checkTodo} />
+                      ? <CheckCircle2 size={18} className={styles.checkDone} />
+                      : <Circle size={18} className={styles.checkTodo} />
                     }
                   </button>
                   <Link
@@ -235,10 +197,99 @@ function HomeDashboard() {
               );
             })}
           </div>
+        )}
+      </section>
+
+      {/* 2. CURRENT CONTEXT (Active Projects with Context Badges) */}
+      {activeProjects.length > 0 && (
+        <section className={styles.section}>
+          <div className="section-header">
+            <span className="section-title">Current Context</span>
+            <Link href="/projects" className={styles.seeAll} id="link-home-projects-all">
+              See all <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className={styles.projectsRow}>
+            {activeProjects.map(proj => {
+              const ctx = projectContexts[proj.id];
+              const meta = (proj.metadata || {}) as ProjectMetadata;
+              const color = meta.color || 'var(--accent-primary)';
+              const openTasks = ctx?.openTasksCount ?? 0;
+              const notesCount = ctx?.notes?.length ?? 0;
+              const expensesTotal = ctx?.totalExpenses ?? 0;
+
+              return (
+                <Link
+                  key={proj.id}
+                  href={`/track/${proj.id}`}
+                  className={styles.projectSpotlightCard}
+                  style={{ borderLeftColor: color }}
+                >
+                  <div className={styles.projSpotlightTop}>
+                    <span className={styles.projSpotlightTitle}>{proj.title}</span>
+                  </div>
+                  {proj.content && (
+                    <p className={styles.projSpotlightDesc}>{proj.content}</p>
+                  )}
+                  <div className={styles.projBadgesRow}>
+                    <span className={styles.projBadge}>
+                      <CheckCircle2 size={11} />
+                      {openTasks} task{openTasks !== 1 ? 's' : ''}
+                    </span>
+                    <span className={styles.projBadge}>
+                      <FileText size={11} />
+                      {notesCount} note{notesCount !== 1 ? 's' : ''}
+                    </span>
+                    {expensesTotal > 0 && (
+                      <span className={styles.projBadge}>
+                        <DollarSign size={11} />
+                        ₹{expensesTotal.toLocaleString('en-IN')}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </section>
       )}
 
-      {/* Tracking */}
+      {/* 3. RECENT ACTIVITY */}
+      {recentActivity.length > 0 && (
+        <section className={styles.section}>
+          <div className="section-header">
+            <span className="section-title">Recent Activity</span>
+          </div>
+          <div className={styles.activityList}>
+            {recentActivity.map(act => (
+              <div key={act.id} className={styles.activityItem}>
+                <div className={styles.activityIconWrap}>
+                  {getActivityIcon(act.type)}
+                </div>
+                <span className={styles.activityDesc}>{act.description}</span>
+                <span className={styles.activityTime}>{act.time}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 4. THIS MONTH SNAPSHOT */}
+      <section className={styles.section}>
+        <div className="section-header">
+          <span className="section-title">This Month</span>
+          <Link href="/money" className={styles.seeAll} id="link-home-money-all">
+            See all <ChevronRight size={14} />
+          </Link>
+        </div>
+        <div className={styles.moneyCards}>
+          <MoneyCard label="Income" amount={monthlyTotals.income} positive />
+          <MoneyCard label="Expenses" amount={monthlyTotals.expenses} />
+          <MoneyCard label="Net" amount={monthlyTotals.net} positive={monthlyTotals.net >= 0} />
+        </div>
+      </section>
+
+      {/* 5. TRACKING (if active trackers exist) */}
       {activeTrackers.length > 0 && (
         <section className={styles.section}>
           <div className="section-header">
@@ -255,22 +306,7 @@ function HomeDashboard() {
         </section>
       )}
 
-      {/* Money snapshot */}
-      <section className={styles.section}>
-        <div className="section-header">
-          <span className="section-title">This Month</span>
-          <Link href="/money" className={styles.seeAll} id="link-home-money-all">
-            See all <ChevronRight size={14} />
-          </Link>
-        </div>
-        <div className={styles.moneyCards}>
-          <MoneyCard label="Income" amount={monthlyTotals.income} positive />
-          <MoneyCard label="Expenses" amount={monthlyTotals.expenses} />
-          <MoneyCard label="Net" amount={monthlyTotals.net} positive={monthlyTotals.net >= 0} />
-        </div>
-      </section>
-
-      {/* Recent Notes */}
+      {/* 6. RECENT NOTES */}
       {recentNotes.length > 0 && (
         <section className={styles.section}>
           <div className="section-header">
@@ -287,9 +323,11 @@ function HomeDashboard() {
                 className={styles.noteCard}
                 id={`link-note-${note.id}`}
               >
-                <span className={styles.noteEmoji}>{note.type === 'journal' ? '📖' : '📝'}</span>
+                <div className={styles.noteIconWrap}>
+                  <FileText size={15} />
+                </div>
                 <div className={styles.noteInfo}>
-                  <span className={styles.noteTitle}>{note.title}</span>
+                  <span className={styles.noteTitle}>{note.title || 'Untitled Note'}</span>
                   <span className={styles.notePreview}>
                     {note.content?.slice(0, 60)?.replace(/\n/g, ' ') || 'Empty note'}
                   </span>
@@ -301,25 +339,7 @@ function HomeDashboard() {
         </section>
       )}
 
-      {/* Recent Activity */}
-      {recentActivity.length > 0 && (
-        <section className={styles.section}>
-          <div className="section-header">
-            <span className="section-title">Activity</span>
-          </div>
-          <div className={styles.activityList}>
-            {recentActivity.map(act => (
-              <div key={act.id} className={styles.activityItem}>
-                <span className={styles.activityEmoji}>{act.emoji}</span>
-                <span className={styles.activityDesc}>{act.description}</span>
-                <span className={styles.activityTime}>{act.time}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Bottom padding for nav */}
+      {/* Bottom spacing */}
       <div style={{ height: 32 }} />
     </div>
   );
@@ -341,12 +361,14 @@ function TrackerMiniCard({ tracker }: { tracker: Item }) {
       id={`link-tracker-${tracker.id}`}
     >
       <div className={styles.trackerHeader}>
-        <span className={styles.trackerEmoji}>{meta.emoji ?? '🎯'}</span>
+        <div className={styles.trackerIconWrap}>
+          <Target size={16} />
+        </div>
         <div className={styles.trackerInfo}>
           <span className={styles.trackerName}>{tracker.title}</span>
           {streak > 0 && (
             <span className="streak-badge">
-              <span className="streak-fire">🔥</span> {streak} day{streak !== 1 ? 's' : ''}
+              {streak} day{streak !== 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -380,15 +402,23 @@ function MoneyCard({ label, amount, positive }: { label: string; amount: number;
   );
 }
 
-function getActivityEmoji(type: string): string {
-  const map: Record<string, string> = {
-    task_completed: '✅',
-    tracker_day_completed: '🎯',
-    expense_added: '💸',
-    income_added: '💵',
-    note_saved: '📝',
-    item_created: '✨',
-    item_updated: '✏️',
-  };
-  return map[type] ?? '📌';
+function getActivityIcon(type: string) {
+  switch (type) {
+    case 'task_completed':
+      return <CheckCircle2 size={15} style={{ color: 'var(--color-success)' }} />;
+    case 'tracker_day_completed':
+      return <Target size={15} style={{ color: 'var(--accent-primary)' }} />;
+    case 'expense_added':
+      return <DollarSign size={15} style={{ color: 'var(--color-danger)' }} />;
+    case 'income_added':
+      return <DollarSign size={15} style={{ color: 'var(--color-success)' }} />;
+    case 'note_saved':
+      return <FileText size={15} style={{ color: 'var(--text-secondary)' }} />;
+    case 'item_created':
+      return <PlusCircle size={15} style={{ color: 'var(--accent-primary)' }} />;
+    case 'item_updated':
+      return <Edit3 size={15} style={{ color: 'var(--text-tertiary)' }} />;
+    default:
+      return <Clock size={15} style={{ color: 'var(--text-tertiary)' }} />;
+  }
 }

@@ -77,18 +77,20 @@
 .inboxBadge {
   margin-left: auto;
   font-size: 0.7rem;
-  font-weight: 700;
-  color: #fff;
-  background: var(--primary, #6366f1);
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   padding: 1px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   line-height: 1.2;
 }
 
 .navItem.active {
-  background: var(--accent-glow);
-  color: var(--accent-secondary);
-  font-weight: 700;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
 }
 
 .quickAddBtn {
@@ -96,23 +98,21 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px;
+  padding: 9px 12px;
   background: var(--accent-primary);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: white;
   font-family: var(--font-family);
   font-size: var(--font-size-sm);
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-spring);
-  box-shadow: 0 4px 14px var(--accent-glow);
+  transition: background var(--transition-fast), transform var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
   margin-top: var(--space-2);
 }
 .quickAddBtn:hover {
   background: var(--accent-secondary);
-  transform: translateY(-1px);
 }
 .quickAddBtn:active {
   transform: scale(0.98);

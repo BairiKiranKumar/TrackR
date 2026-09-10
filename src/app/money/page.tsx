@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Plus, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
+import { AlertTriangle, Plus, TrendingUp, TrendingDown, Trash2, DollarSign, Target } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { BudgetProgress, Item, TransactionCategory, TransactionMetadata, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/types';
-import { formatAmount } from '@/lib/services/MoneyParser';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import { dataService } from '@/lib/services/DataService';
 import { format } from 'date-fns';
 import styles from './page.module.css';
@@ -41,9 +41,14 @@ export default function MoneyPage() {
   async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to delete "${title}"?`)) return;
-    await dataService.deleteItem(id);
-    await refreshItems();
+    const confirmed = window.confirm(`Are you sure you want to delete "${title || 'this item'}"?`);
+    if (!confirmed) return;
+    try {
+      await dataService.deleteItem(id);
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+    }
   }
 
   return (
@@ -145,9 +150,21 @@ export default function MoneyPage() {
         <div className={styles.content}>
           {allTxns.length === 0 ? (
             <div className="empty-state">
-              <span className="empty-state__icon">💰</span>
-              <span className="empty-state__title">No transactions yet</span>
-              <span className="empty-state__subtitle">Add expenses and income to track your money flow.</span>
+              <span className="empty-state__icon"><DollarSign size={36} /></span>
+              <span className="empty-state__title">No expenses yet</span>
+              <span className="empty-state__subtitle">Start logging expenses to understand your spending.</span>
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowExpenseForm(true)}
+                  id="btn-money-add-first-expense"
+                >
+                  <Plus size={16} /> Add expense
+                </button>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>
+                  You can also capture an expense from Quick Capture.
+                </span>
+              </div>
             </div>
           ) : (
             <div className={styles.txnList}>
@@ -168,7 +185,7 @@ export default function MoneyPage() {
         <div className={styles.content}>
           {goals.length === 0 ? (
             <div className="empty-state">
-              <span className="empty-state__icon">🎯</span>
+              <span className="empty-state__icon"><Target size={36} /></span>
               <span className="empty-state__title">No financial goals yet</span>
               <span className="empty-state__subtitle">Set a savings goal from the Track page.</span>
             </div>
@@ -180,27 +197,33 @@ export default function MoneyPage() {
                 const current = meta.currentAmount ?? 0;
                 const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
                 return (
-                  <Link key={goal.id} href={`/track/${goal.id}`} className={styles.goalCard} id={`link-money-goal-${goal.id}`}>
+                  <div key={goal.id} className={styles.goalCard} id={`money-goal-${goal.id}`}>
                     <div className={styles.goalHeader}>
-                      <span className={styles.goalName}>⭐ {goal.title}</span>
-                      <span className={styles.goalPct}>{Math.round(pct)}%</span>
+                      <Link href={`/track/${goal.id}`} className={styles.goalLink} id={`link-money-goal-${goal.id}`}>
+                        <span className={styles.goalName}>{goal.title}</span>
+                        <span className={styles.goalPct}>{Math.round(pct)}%</span>
+                      </Link>
                       <button
+                        type="button"
                         className="btn btn-icon btn-ghost"
                         onClick={(e) => handleDeleteItem(e, goal.id, goal.title)}
+                        id={`btn-delete-money-goal-${goal.id}`}
                         title="Delete goal"
-                        style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4 }}
+                        style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
                       >
                         <Trash2 size={16} />
                       </button>
                     </div>
-                    <div className="progress-track">
-                      <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
-                    </div>
-                    <div className={styles.goalAmounts}>
-                      <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
-                      <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
-                    </div>
-                  </Link>
+                    <Link href={`/track/${goal.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+                      <div className="progress-track">
+                        <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
+                      </div>
+                      <div className={styles.goalAmounts}>
+                        <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
+                      </div>
+                    </Link>
+                  </div>
                 );
               })}
             </div>
@@ -212,7 +235,13 @@ export default function MoneyPage() {
       {showExpenseForm && (
         <>
           <div className="overlay" onClick={() => setShowExpenseForm(false)} />
-          <div className={styles.formSheet}>
+          <div
+            className={styles.formSheet}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add expense"
+            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowExpenseForm(false); } }}
+          >
             <div className={styles.handle} />
             <TransactionForm
               isIncome={false}
@@ -225,7 +254,13 @@ export default function MoneyPage() {
       {showIncomeForm && (
         <>
           <div className="overlay" onClick={() => setShowIncomeForm(false)} />
-          <div className={styles.formSheet}>
+          <div
+            className={styles.formSheet}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add income"
+            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowIncomeForm(false); } }}
+          >
             <div className={styles.handle} />
             <TransactionForm
               isIncome={true}
@@ -238,7 +273,13 @@ export default function MoneyPage() {
       {showBudgetForm && (
         <>
           <div className="overlay" onClick={() => setShowBudgetForm(false)} />
-          <div className={styles.formSheet}>
+          <div
+            className={styles.formSheet}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Set budget"
+            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowBudgetForm(false); } }}
+          >
             <div className={styles.handle} />
             <BudgetForm onClose={() => setShowBudgetForm(false)} onSaved={async () => { await refreshItems(); setShowBudgetForm(false); }} />
           </div>
@@ -332,28 +373,32 @@ function TransactionCard({ txn, onDelete }: { txn: Item; onDelete?: (e: React.Mo
     : EXPENSE_CATEGORIES.find(c => c.value === meta.category);
 
   return (
-    <Link href={`/track/${txn.id}`} className={styles.txnCard} id={`link-txn-${txn.id}`}>
-      <span className={styles.txnEmoji}>{cat?.emoji ?? '💫'}</span>
-      <div className={styles.txnInfo}>
-        <span className={styles.txnTitle}>{txn.title}</span>
-        <span className={styles.txnDate}>
-          {cat?.label} · {meta.date ? format(new Date(meta.date), 'MMM d') : ''}
+    <div className={styles.txnCard} id={`txn-card-${txn.id}`}>
+      <Link href={`/track/${txn.id}`} className={styles.txnMainLink} id={`link-txn-${txn.id}`}>
+        <span className={styles.txnEmoji}>{cat?.emoji ?? '💫'}</span>
+        <div className={styles.txnInfo}>
+          <span className={styles.txnTitle}>{txn.title}</span>
+          <span className={styles.txnDate}>
+            {cat?.label} · {meta.date ? format(new Date(meta.date), 'MMM d') : ''}
+          </span>
+        </div>
+        <span className={`${styles.txnAmount} ${isIncome ? styles.positive : styles.negative}`}>
+          {isIncome ? '+' : '-'}{formatAmount(meta.amount)}
         </span>
-      </div>
-      <span className={`${styles.txnAmount} ${isIncome ? styles.positive : styles.negative}`}>
-        {isIncome ? '+' : '-'}{formatAmount(meta.amount)}
-      </span>
+      </Link>
       {onDelete && (
         <button
+          type="button"
           className="btn btn-icon btn-ghost"
           onClick={onDelete}
+          id={`btn-delete-txn-${txn.id}`}
           title="Delete transaction"
-          style={{ color: 'var(--text-tertiary)', padding: 4, marginLeft: 8 }}
+          style={{ color: 'var(--text-tertiary)', padding: 4, marginLeft: 8, flexShrink: 0 }}
         >
           <Trash2 size={15} />
         </button>
       )}
-    </Link>
+    </div>
   );
 }
 

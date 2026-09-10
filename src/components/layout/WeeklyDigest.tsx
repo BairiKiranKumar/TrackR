@@ -6,7 +6,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { dataService } from '@/lib/services/DataService';
 import { WeeklyDigestSummary } from '@/types';
-import { formatAmount } from '@/lib/services/MoneyParser';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import styles from './WeeklyDigest.module.css';
 
 function localDateKey(date: Date): string {

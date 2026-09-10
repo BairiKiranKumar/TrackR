@@ -9,7 +9,7 @@ import { dataService } from '@/lib/services/DataService';
 import { BudgetProgress, InAppNotification, TaskMetadata } from '@/types';
 import styles from './AppHeader.module.css';
 
-type SyncDot = 'synced' | 'syncing' | 'pending' | 'failed' | 'offline' | 'idle';
+type SyncDot = 'synced' | 'syncing' | 'pending' | 'failed' | 'offline' | 'idle' | 'needs_attention';
 
 const HIDE_HEADER_ROUTES = ['/auth', '/auth/callback', '/auth/setup'];
 
@@ -99,14 +99,15 @@ export function AppHeader() {
     synced: 'Synced',
     syncing: 'Syncing…',
     pending: pendingCount > 0 ? `Pending (${pendingCount})` : 'Pending',
-    failed: 'Sync issue',
+    failed: 'Sync issue — retrying',
+    needs_attention: 'Sync needs attention',
     offline: 'Offline',
     idle: userConfig ? 'Connected' : 'Local only',
   }[syncStatus] || 'Local only';
   const SyncIcon =
     syncStatus === 'syncing' || syncStatus === 'pending'
       ? RefreshCw
-      : syncStatus === 'failed'
+      : syncStatus === 'failed' || syncStatus === 'needs_attention'
       ? CircleAlert
       : syncStatus === 'offline'
       ? WifiOff

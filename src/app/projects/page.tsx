@@ -305,7 +305,14 @@ export default function ProjectsPage() {
       {/* New Project Modal */}
       {showNewModal && (
         <div className={styles.modalOverlay} onClick={() => setShowNewModal(false)}>
-          <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+          <div
+            className={styles.modalBox}
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Create new project"
+            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowNewModal(false); } }}
+          >
             <div className={styles.modalHeader}>
               <h3 className={styles.modalTitle}>Create New Project</h3>
               <button

@@ -187,7 +187,7 @@ export type SyncOperationType =
   | 'relation_delete'
   | 'clear_all';
 
-export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'failed' | 'synced' | 'offline';
+export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'failed' | 'synced' | 'offline' | 'needs_attention';
 
 export interface SyncOperation {
   id: string;
@@ -379,6 +379,13 @@ export interface SupabaseSyncState {
   lastSyncedAt?: string;
   error?: string;
 }
+
+// ─── Storage mode ──────────────────────────────────────────────────────────
+// Where a signed-in user's data syncs to. New users default to 'trackr_cloud'
+// automatically — no setup step. 'custom_supabase' (BYODB) is an advanced,
+// explicitly-opted-into setting managed from Settings → Data & Storage.
+
+export type StorageMode = 'trackr_cloud' | 'custom_supabase';
 
 // ─── Helper / derived types ────────────────────────────────────────────────
 

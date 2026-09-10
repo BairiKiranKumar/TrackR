@@ -103,3 +103,15 @@ export class MoneyDetectionService implements MoneyDetector {
 }
 
 export const moneyDetectionService = new MoneyDetectionService();
+
+// Standalone function exports — this is the single canonical money
+// parsing/formatting implementation (see §8 audit: MoneyParser.ts was a
+// second, less capable duplicate of this same responsibility and has been
+// removed; every caller now imports from here).
+export function formatINR(amount: number): string {
+  return moneyDetectionService.formatINR(amount);
+}
+
+export function formatAmount(amount: number, currency = 'INR'): string {
+  return moneyDetectionService.formatAmount(amount, currency);
+}

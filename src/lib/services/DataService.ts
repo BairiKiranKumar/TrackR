@@ -1,10 +1,10 @@
 import {
   getAllItems, getItemById, getItemsByType, saveItem,
   archiveItem as localArchiveItem, getRelationsForSource, getRelationsForTarget,
-  saveRelation, deleteRelationsForSource, getRecentActivity,
+  saveRelation, getRecentActivity,
   saveActivityEvent, searchItems, getSetting, setSetting, getAllRelations,
   deleteItem as localDeleteItem, deleteRelationsForItem, clearAllData as localClearAllData,
-  deleteRelation, deleteRelationByPair, getAllActivityEvents, getItemsByTag
+  deleteRelation, deleteRelationByPair, getAllActivityEvents
 } from '@/lib/db/localDb';
 import { buildRelationsFromText } from './ReferenceParser';
 import {
@@ -13,8 +13,8 @@ import {
   TransactionMetadata, WeeklyDigestSummary, ProjectContextSummary,
   InboxMetadata, SyncStatus, RelationType
 } from '@/types';
-import { getUserSupabase } from '@/lib/supabase';
 import { syncQueueService } from './SyncQueueService';
+import { storageModeService } from './StorageModeService';
 import { createSampleProjectDataset } from '@/lib/db/demoData';
 
 // ─── ID generation ─────────────────────────────────────────────────────────
@@ -34,43 +34,11 @@ function getPreviousDateKey(dateKey: string): string {
   return getLocalDateKey(date);
 }
 
-// ─── Supabase transform helpers ─────────────────────────────────────────────
-// IndexedDB uses camelCase; Supabase tables use snake_case
-
-function toSbRow(item: Item): Record<string, unknown> {
-  return {
-    id: item.id,
-    type: item.type,
-    title: item.title,
-    content: item.content ?? '',
-    metadata: item.metadata ?? {},
-    tags: item.tags ?? [],
-    pinned: item.pinned ?? false,
-    archived: item.archived ?? false,
-    created_at: item.createdAt,
-    updated_at: item.updatedAt,
-  };
-}
-
-function fromSbRow(row: Record<string, unknown>): Item {
-  return {
-    id: row.id as string,
-    type: row.type as ItemType,
-    title: row.title as string,
-    content: (row.content as string) ?? '',
-    metadata: (row.metadata as Record<string, unknown>) ?? {},
-    tags: (row.tags as string[]) ?? [],
-    pinned: (row.pinned as boolean) ?? false,
-    archived: (row.archived as boolean) ?? false,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-  };
-}
-
 export type SyncStateInfo = {
   status: SyncStatus;
   pendingCount: number;
   failedCount: number;
+  attentionCount: number;
 };
 export type SyncListener = (statusOrState: SyncStatus | SyncStateInfo) => void;
 
@@ -85,28 +53,37 @@ class DataService {
     });
   }
 
-  // ── Pull from Supabase on login ──────────────────────────────────────────
-  // Called by AuthProvider after user config is loaded.
-  // Downloads all items from Supabase and saves them to local IndexedDB.
+  // ── Sync issue inspection / recovery ─────────────────────────────────────
+  // Operations that gave up retrying automatically (see SyncQueueService's
+  // MAX_RETRIES) end up here. Nothing is ever silently discarded — the user
+  // can retry or explicitly dismiss, and the underlying local data is
+  // unaffected either way.
+
+  async getSyncOpsNeedingAttention() {
+    return syncQueueService.getOpsNeedingAttention();
+  }
+
+  async retrySyncOp(id: string): Promise<void> {
+    return syncQueueService.retryOp(id);
+  }
+
+  async dismissSyncOp(id: string): Promise<void> {
+    return syncQueueService.discardOp(id);
+  }
+
+  // ── Pull from remote on login ─────────────────────────────────────────────
+  // Called by AuthProvider once it knows which storage destination applies
+  // (TRACKR Cloud by default, or the user's own Supabase for BYODB).
+  // Downloads that provider's items and merges them into local IndexedDB.
 
   async pullFromSupabase(): Promise<void> {
-    const sb = getUserSupabase();
-    if (!sb) return;
+    const provider = await storageModeService.getActiveProvider();
+    if (!provider) return;
 
     try {
-      const { data: rows, error } = await sb
-        .from('items')
-        .select('*')
-        .eq('archived', false)
-        .order('updated_at', { ascending: false });
-
-      if (error || !rows) {
-        return;
-      }
-
+      const remoteItems = await provider.pullItems();
       // Merge remote → local (remote wins for newer records)
-      for (const row of rows) {
-        const remoteItem = fromSbRow(row as Record<string, unknown>);
+      for (const remoteItem of remoteItems) {
         const localItem = await getItemById(remoteItem.id);
         if (!localItem || remoteItem.updatedAt > localItem.updatedAt) {
           await saveItem(remoteItem);
@@ -117,24 +94,70 @@ class DataService {
     }
   }
 
-  // ── Push local → Supabase (initial sync for existing local data) ─────────
+  // ── Push local → remote (initial sync for existing local data) ───────────
 
   async pushLocalToSupabase(): Promise<void> {
-    const sb = getUserSupabase();
-    if (!sb) return;
+    const provider = await storageModeService.getActiveProvider();
+    if (!provider) return;
     const items = await getAllItems();
     if (!items.length) return;
 
-    try {
-      const rows = items.map(toSbRow);
-      // Batch upsert (Supabase supports arrays)
-      await sb.from('items').upsert(rows, { onConflict: 'id' });
-    } catch {
-      // Enqueue sync operation for reliability
-      for (const item of items) {
-        await syncQueueService.enqueue('item', item.id, 'upsert', item);
-      }
+    // Routed through the sync queue (not a direct bulk upsert) so failures
+    // retry individually and survive a reload, same as every other write.
+    for (const item of items) {
+      await syncQueueService.enqueue('item', item.id, 'upsert', item);
     }
+  }
+
+  // ── Storage migration (§10/§12: switching between TRACKR Cloud and BYODB) ─
+  // Re-enqueues every local item and relation for upload to whichever
+  // provider is active *right now* — call this immediately after switching
+  // storage mode, when the user explicitly asked to move their existing
+  // data rather than just redirect future writes.
+
+  async migrateAllLocalDataToActiveProvider(): Promise<{ itemsCount: number; relationsCount: number }> {
+    const [items, relations] = await Promise.all([getAllItems(), getAllRelations()]);
+    for (const item of items) {
+      await syncQueueService.enqueue('item', item.id, 'upsert', item);
+    }
+    for (const rel of relations) {
+      await syncQueueService.enqueue('item_relation', rel.id, 'upsert', rel);
+    }
+    return { itemsCount: items.length, relationsCount: relations.length };
+  }
+
+  // ── Account deletion (§13) ────────────────────────────────────────────────
+  // Sequence: (1) caller verifies the user (confirmation UI) before calling
+  // this — not this method's job; (2) wipe this account's rows from whatever
+  // remote provider is currently active; (3) wipe local IndexedDB, which
+  // removes items, relations (so no orphaned relationships survive) and the
+  // sync queue together. Invalidating the session (step 4 of the product
+  // spec) is deliberately left to the caller — Settings calls AuthService's
+  // signOut() right after this resolves — so this method stays testable
+  // without pulling auth into DataService.
+  //
+  // NOT wired to a UI button yet: this has only been verified against a
+  // fake provider in tests, not a real TRACKR Cloud project (no live
+  // managed database exists to test against in this environment). See the
+  // audit report's Known Limitations before exposing this destructively.
+
+  async deleteAccountData(): Promise<{ remoteCleared: boolean; localCleared: boolean; error?: string }> {
+    let remoteCleared = false;
+    let error: string | undefined;
+    try {
+      const provider = await storageModeService.getActiveProvider();
+      if (provider) {
+        await provider.clearAll();
+        remoteCleared = true;
+      } else {
+        remoteCleared = true; // nothing remote to clear (local-only / offline account)
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to clear remote account data.';
+    }
+
+    await localClearAllData();
+    return { remoteCleared, localCleared: true, error };
   }
 
   // ── Items ──────────────────────────────────────────────────────────────
@@ -206,18 +229,30 @@ class DataService {
 
   async archiveItem(id: string): Promise<void> {
     await localArchiveItem(id);
-    await syncQueueService.enqueue('item', id, 'update', { archived: true });
+    // Send the full item, not a partial fragment — the sync payload is upserted
+    // wholesale to Supabase, so a `{ archived: true }` fragment would overwrite
+    // the remote row with blank/undefined fields.
+    const item = await getItemById(id);
+    if (item) await syncQueueService.enqueue('item', id, 'upsert', item);
   }
 
   async deleteItem(id: string): Promise<void> {
     await localDeleteItem(id);
-    await deleteRelationsForItem(id);
-    await syncQueueService.enqueue('item', id, 'delete');
+    try {
+      await deleteRelationsForItem(id);
+    } catch (err) {
+      console.warn('Failed to delete relations for item:', err);
+    }
+    try {
+      await syncQueueService.enqueue('item', id, 'delete');
+    } catch (err) {
+      console.warn('Failed to enqueue delete sync op:', err);
+    }
   }
 
   async clearAllData(): Promise<void> {
     await localClearAllData();
-    await syncQueueService.enqueue('database', 'all', 'clear');
+    await syncQueueService.enqueue('database', 'all', 'clear_all');
   }
 
   // ── References & Bidirectional Linking ─────────────────────────────────
@@ -226,8 +261,16 @@ class DataService {
     const allItems = await getAllItems();
     const relations = buildRelationsFromText(sourceId, content, allItems);
 
-    await deleteRelationsForSource(sourceId);
-    await syncQueueService.enqueue('item_relation', sourceId, 'delete');
+    // Only replace auto-detected @mention ("references") relations here.
+    // Manually created links (explicit "Link item", project assignment, etc.)
+    // use other relation types and must survive unrelated content edits —
+    // wiping ALL outgoing relations on every content save was destroying them.
+    const existingAutoRefs = (await getRelationsForSource(sourceId))
+      .filter(r => r.relationType === 'references');
+    for (const rel of existingAutoRefs) {
+      await deleteRelation(rel.id);
+      await syncQueueService.enqueue('item_relation', rel.id, 'delete');
+    }
 
     for (const rel of relations) {
       await saveRelation(rel);
@@ -273,9 +316,24 @@ class DataService {
   }
 
   async unlinkItems(sourceId: string, targetId: string): Promise<void> {
+    // Look up the real relation ids in both directions first — the sync queue
+    // deletes remote rows by id, and a fabricated composite key never matches
+    // a real row, so it must be enqueued per actual relation.
+    const [forward, backward] = await Promise.all([
+      getRelationsForSource(sourceId),
+      getRelationsForSource(targetId),
+    ]);
+    const toRemove = [
+      ...forward.filter(r => r.targetId === targetId),
+      ...backward.filter(r => r.targetId === sourceId),
+    ];
+
     await deleteRelationByPair(sourceId, targetId);
     await deleteRelationByPair(targetId, sourceId);
-    await syncQueueService.enqueue('item_relation', `${sourceId}_${targetId}`, 'delete');
+
+    for (const rel of toRemove) {
+      await syncQueueService.enqueue('item_relation', rel.id, 'delete');
+    }
   }
 
   // ── Inbox Triage Helpers ───────────────────────────────────────────────

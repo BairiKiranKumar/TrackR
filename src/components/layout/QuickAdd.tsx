@@ -157,7 +157,18 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
   return (
     <>
       <div className="overlay" onClick={onClose} />
-      <div className={styles.sheet} role="dialog" aria-label="Quick capture">
+      <div
+        className={styles.sheet}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Quick capture"
+        onKeyDown={e => {
+          if (e.key === 'Escape') {
+            e.stopPropagation();
+            onClose();
+          }
+        }}
+      >
         <div className={styles.handle} />
 
         {!showExpenseForm && !showIncomeForm ? (
@@ -165,15 +176,15 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
             {/* Header */}
             <div className={styles.header}>
               <div className={styles.headerLeft}>
-                <span className={styles.titleIcon}>⚡</span>
                 <span className={styles.title}>Quick Capture</span>
               </div>
               <button
                 className="btn btn-icon btn-ghost"
                 onClick={onClose}
                 id="btn-quick-add-close"
+                aria-label="Close quick capture"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
@@ -182,7 +193,7 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
               <textarea
                 autoFocus
                 className={styles.captureTextarea}
-                placeholder="What's on your mind? #tag, @Project, todo: call John, ₹450..."
+                placeholder="What's on your mind? Capture anything..."
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
                 rows={3}
@@ -221,6 +232,19 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
 
               {/* Actions */}
               <div className={styles.captureActions}>
+                {rawText.trim() && (
+                  <button
+                    type="button"
+                    className={styles.openActionBtn}
+                    onClick={() => handleQuickCapture(false)}
+                    disabled={saving || !rawText.trim()}
+                    id="btn-open-in-editor"
+                  >
+                    <span>Open in Editor</span>
+                    <ArrowRight size={13} />
+                  </button>
+                )}
+
                 <button
                   type="button"
                   className={styles.inboxActionBtn}
@@ -228,44 +252,54 @@ export function QuickAdd({ onClose, initialType }: QuickAddProps) {
                   disabled={saving || !rawText.trim()}
                   id="btn-save-to-inbox"
                 >
-                  <Inbox size={15} />
+                  <Inbox size={14} />
                   <span>Save to Inbox</span>
-                  <span className={styles.shortcutKey}>Ctrl+↵</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={styles.openActionBtn}
-                  onClick={() => handleQuickCapture(false)}
-                  disabled={saving || !rawText.trim()}
-                  id="btn-open-in-editor"
-                >
-                  <span>Open</span>
-                  <ArrowRight size={14} />
+                  <span className={styles.shortcutKey}>⌘↵</span>
                 </button>
               </div>
             </div>
 
-            {/* Type Grid */}
-            <div className={styles.orDivider}>
-              <span>or start specific item</span>
-            </div>
-
-            <div className={styles.grid}>
-              {QUICK_ITEMS.map(item => (
+            {/* Direct Creation Secondary Section */}
+            <div className={styles.directSection}>
+              <span className={styles.directLabel}>Create directly</span>
+              <div className={styles.directRow}>
                 <button
-                  key={item.type}
-                  id={`btn-quickadd-${item.type}`}
-                  className={styles.gridItem}
-                  onClick={() => handleSelectType(item.type)}
-                  style={{ '--item-color': item.color, '--item-bg': item.bg } as React.CSSProperties}
+                  type="button"
+                  className={styles.directBtn}
+                  onClick={() => handleSelectType('note')}
+                  id="btn-quickadd-note"
                 >
-                  <span className={styles.gridIcon}>
-                    <item.icon size={20} />
-                  </span>
-                  <span className={styles.gridLabel}>{item.label}</span>
+                  <FileText size={14} />
+                  <span>Note</span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={styles.directBtn}
+                  onClick={() => handleSelectType('task')}
+                  id="btn-quickadd-task"
+                >
+                  <CheckSquare size={14} />
+                  <span>Task</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.directBtn}
+                  onClick={() => handleSelectType('expense')}
+                  id="btn-quickadd-expense"
+                >
+                  <DollarSign size={14} />
+                  <span>Expense</span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.directBtn}
+                  onClick={() => handleSelectType('project')}
+                  id="btn-quickadd-project"
+                >
+                  <Folder size={14} />
+                  <span>Project</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (

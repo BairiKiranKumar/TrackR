@@ -132,6 +132,20 @@
   margin-bottom: var(--space-3);
 }
 
+.trackerMainLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.trackerMainLink:hover .trackerName {
+  color: var(--accent-primary);
+}
+
 .trackerEmoji {
   font-size: 28px;
   line-height: 1;
@@ -228,6 +242,20 @@
   margin-bottom: 4px;
 }
 
+.goalLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.goalLink:hover .goalName {
+  color: var(--accent-primary);
+}
+
 .goalName {
   flex: 1;
   font-size: var(--font-size-base);
@@ -266,6 +294,20 @@
 }
 
 .projectCard:active { transform: scale(0.99); }
+
+.projectMainLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.projectMainLink:hover .projectName {
+  color: var(--accent-primary);
+}
 
 .projectEmoji {
   font-size: 28px;

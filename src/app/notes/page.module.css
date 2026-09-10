@@ -127,6 +127,26 @@
   margin-bottom: 6px;
 }
 
+.noteTitleLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  text-decoration: none;
+  min-width: 0;
+  color: inherit;
+}
+
+.noteTitleLink:hover .noteTitle {
+  color: var(--accent-primary);
+}
+
+.noteBodyLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
 .noteIcon {
   color: var(--text-tertiary);
   display: flex;

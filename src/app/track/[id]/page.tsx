@@ -32,12 +32,14 @@ import {
   ITEM_TYPE_EMOJIS,
   ITEM_TYPE_LABELS,
 } from '@/types';
-import { formatAmount } from '@/lib/services/MoneyParser';
+import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import { format } from 'date-fns';
+import { useAppContext } from '@/components/providers/AppProvider';
 import styles from './page.module.css';
 
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const { refreshItems } = useAppContext();
   const [item, setItem] = useState<Item | null>(null);
   const [backlinks, setBacklinks] = useState<{ relation: ItemRelation; item: Item }[]>([]);
   const [outgoing, setOutgoing] = useState<{ relation: ItemRelation; item: Item }[]>([]);
@@ -97,8 +99,10 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     setDeleting(true);
     try {
       await dataService.deleteItem(item.id);
-      router.back();
-    } catch {
+      await refreshItems();
+      router.push('/track');
+    } catch (err) {
+      console.error('Failed to delete item:', err);
       setDeleting(false);
     }
   }
@@ -467,7 +471,14 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
       {/* Manual Link Modal */}
       {showLinkModal && (
         <div className={styles.modalOverlay} onClick={() => setShowLinkModal(false)}>
-          <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+          <div
+            className={styles.modalBox}
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Connect context"
+            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowLinkModal(false); } }}
+          >
             <div className={styles.modalHeader}>
               <div className={styles.modalTitleRow}>
                 <Link2 size={18} className={styles.modalTitleIcon} />
@@ -483,7 +494,7 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
             </div>
 
             <p className={styles.modalDesc}>
-              Link <strong>&quot;{item.title}&quot;</strong> with another item in your database.
+              Link <strong>&quot;{item.title}&quot;</strong> with another item.
             </p>
 
             <div className={styles.modalRelationSelect}>

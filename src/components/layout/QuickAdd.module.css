@@ -201,63 +201,53 @@
   cursor: not-allowed;
 }
 
-.orDivider {
+.directSection {
   display: flex;
-  align-items: center;
-  text-align: center;
-  font-size: 0.725rem;
-  color: var(--text-muted);
+  flex-direction: column;
+  gap: 8px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.directLabel {
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0.15rem 0;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
 }
 
-.orDivider::before,
-.orDivider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.orDivider span {
-  padding: 0 0.5rem;
-}
-
-/* Grid */
-.grid {
+.directRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
-.gridItem {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 6px;
-  border-radius: var(--radius-md, 8px);
-  background: var(--item-bg, var(--bg-card));
-  border: 1px solid var(--border-subtle);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  color: var(--item-color, var(--text-secondary));
-  font-family: inherit;
-}
-
-.gridItem:hover {
-  transform: translateY(-2px);
-  border-color: var(--item-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.gridIcon {
-  display: flex;
+.directBtn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.gridLabel {
-  font-size: 11px;
-  font-weight: 600;
+.directBtn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.directBtn:active {
+  transform: scale(0.98);
 }

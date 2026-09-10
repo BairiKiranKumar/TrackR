@@ -6,38 +6,21 @@ import {
   getAllSyncOps,
 } from '@/lib/db/localDb';
 import { SyncOperation, SyncOperationType, SyncStatus, Item, ItemRelation } from '@/types';
-import { getUserSupabase } from '@/lib/supabase';
+import { storageModeService } from './StorageModeService';
+import { RemoteStorageProvider } from '@/lib/storage/RemoteStorageProvider';
 
-type StatusListener = (state: { status: SyncStatus; pendingCount: number; failedCount: number }) => void;
+// After this many failed attempts, an operation stops auto-retrying and is
+// marked 'needs_attention' instead of 'failed' — it is never discarded, just
+// no longer retried automatically, so a permanently-invalid op (bad schema,
+// stale foreign key, etc.) doesn't spin forever. A transient network blip
+// recovers well before this many attempts thanks to exponential backoff.
+const MAX_RETRIES = 8;
+
+type StatusListener = (state: { status: SyncStatus; pendingCount: number; failedCount: number; attentionCount: number }) => void;
 
 function genId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function toSbRow(item: Item): Record<string, unknown> {
-  return {
-    id: item.id,
-    type: item.type,
-    title: item.title,
-    content: item.content ?? '',
-    metadata: item.metadata ?? {},
-    tags: item.tags ?? [],
-    pinned: item.pinned ?? false,
-    archived: item.archived ?? false,
-    created_at: item.createdAt,
-    updated_at: item.updatedAt,
-  };
-}
-
-function toSbRelation(relation: ItemRelation): Record<string, unknown> {
-  return {
-    id: relation.id,
-    source_id: relation.sourceId,
-    target_id: relation.targetId,
-    relation_type: relation.relationType,
-    created_at: relation.createdAt,
-  };
 }
 
 class SyncQueueService {
@@ -63,10 +46,13 @@ class SyncQueueService {
     const ops = await getAllSyncOps();
     const pending = ops.filter(o => o.status === 'pending');
     const failed = ops.filter(o => o.status === 'failed');
+    const attention = ops.filter(o => o.status === 'needs_attention');
 
     let status: SyncStatus = 'synced';
     if (this.processing) {
       status = 'syncing';
+    } else if (attention.length > 0) {
+      status = 'needs_attention';
     } else if (failed.length > 0) {
       status = 'failed';
     } else if (pending.length > 0) {
@@ -77,11 +63,41 @@ class SyncQueueService {
       status,
       pendingCount: pending.length + (this.processing ? 1 : 0),
       failedCount: failed.length,
+      attentionCount: attention.length,
     };
 
     this.listeners.forEach(fn => {
       try { fn(state); } catch (e) { console.error('Sync listener error:', e); }
     });
+  }
+
+  /** Ops that are no longer being retried automatically and need a manual look. */
+  public async getOpsNeedingAttention(): Promise<SyncOperation[]> {
+    const ops = await getAllSyncOps();
+    return ops.filter(o => o.status === 'needs_attention');
+  }
+
+  /** Manually re-arm a stuck operation for one more round of automatic retries. */
+  public async retryOp(id: string): Promise<void> {
+    const ops = await getAllSyncOps();
+    const op = ops.find(o => o.id === id);
+    if (!op) return;
+    op.status = 'pending';
+    op.retryCount = 0;
+    op.lastError = undefined;
+    await updateSyncOp(op);
+    this.emitStatus();
+    this.trigger();
+  }
+
+  /**
+   * Explicitly drop a stuck operation without retrying it again. This only
+   * removes the queued *sync* record — it never touches the local item/
+   * relation data, which stays exactly as the user left it.
+   */
+  public async discardOp(id: string): Promise<void> {
+    await deleteSyncOp(id);
+    this.emitStatus();
   }
 
   public async enqueue(
@@ -120,9 +136,9 @@ class SyncQueueService {
       return;
     }
 
-    const sb = getUserSupabase();
-    if (!sb) {
-      // Local only mode — cloud sync not configured
+    const provider = await storageModeService.getActiveProvider();
+    if (!provider) {
+      // Not signed in, or no storage destination resolved yet — local only.
       this.emitStatus();
       return;
     }
@@ -143,14 +159,17 @@ class SyncQueueService {
         }
 
         try {
-          await this.executeOp(op, sb);
+          await this.executeOp(op, provider);
           await deleteSyncOp(op.id);
         } catch (err: unknown) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           op.retryCount += 1;
           op.lastAttemptAt = new Date().toISOString();
           op.lastError = errorMsg;
-          op.status = 'failed';
+          // Stop auto-retrying a permanently-invalid op after MAX_RETRIES, but
+          // never delete it — it stays inspectable/retryable via retryOp(),
+          // and the local item/relation data it describes is untouched either way.
+          op.status = op.retryCount >= MAX_RETRIES ? 'needs_attention' : 'failed';
           await updateSyncOp(op);
         }
       }
@@ -160,52 +179,37 @@ class SyncQueueService {
     }
   }
 
-  private async executeOp(op: SyncOperation, sb: ReturnType<typeof getUserSupabase>): Promise<void> {
-    if (!sb) return;
-
+  private async executeOp(op: SyncOperation, provider: RemoteStorageProvider): Promise<void> {
     switch (op.operation) {
       case 'create':
-      case 'update': {
+      case 'update':
+      case 'upsert': {
         if (op.entityType === 'item' && op.payload) {
-          const row = toSbRow(op.payload as Item);
-          const { error } = await sb.from('items').upsert(row, { onConflict: 'id' });
-          if (error) throw error;
+          await provider.upsertItem(op.payload as Item);
         } else if (op.entityType === 'item_relation' && op.payload) {
-          const row = toSbRelation(op.payload as ItemRelation);
-          const { error } = await sb.from('item_relations').upsert(row, { onConflict: 'id' });
-          if (error) throw error;
+          await provider.upsertRelation(op.payload as ItemRelation);
         }
         break;
       }
       case 'delete': {
         if (op.entityType === 'item') {
-          const { error: err1 } = await sb.from('items').delete().eq('id', op.entityId);
-          if (err1) throw err1;
-          // also delete relations pointing to/from this item
-          await sb.from('item_relations').delete().or(`source_id.eq.${op.entityId},target_id.eq.${op.entityId}`);
+          await provider.deleteItem(op.entityId);
         } else if (op.entityType === 'item_relation') {
-          const { error } = await sb.from('item_relations').delete().eq('id', op.entityId);
-          if (error) throw error;
+          await provider.deleteRelation(op.entityId);
         }
         break;
       }
       case 'relation_create': {
-        if (op.payload) {
-          const row = toSbRelation(op.payload as ItemRelation);
-          const { error } = await sb.from('item_relations').upsert(row, { onConflict: 'id' });
-          if (error) throw error;
-        }
+        if (op.payload) await provider.upsertRelation(op.payload as ItemRelation);
         break;
       }
       case 'relation_delete': {
-        const { error } = await sb.from('item_relations').delete().eq('id', op.entityId);
-        if (error) throw error;
+        await provider.deleteRelation(op.entityId);
         break;
       }
+      case 'clear':
       case 'clear_all': {
-        await sb.from('items').delete().neq('id', '0');
-        await sb.from('item_relations').delete().neq('id', '0');
-        await sb.from('activity_events').delete().neq('id', '0');
+        await provider.clearAll();
         break;
       }
     }

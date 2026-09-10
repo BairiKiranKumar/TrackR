@@ -95,7 +95,7 @@ function SearchContent() {
       {/* No results */}
       {!loading && searched && results.length === 0 && (
         <div className="empty-state">
-          <span className="empty-state__icon">🔍</span>
+          <span className="empty-state__icon"><SearchIcon size={36} /></span>
           <span className="empty-state__title">No results for &ldquo;{query}&rdquo;</span>
           <span className="empty-state__subtitle">Try a different keyword or browse by section.</span>
         </div>
@@ -112,7 +112,7 @@ function SearchContent() {
               <div key={type} className={styles.group}>
                 <div className="section-header">
                   <span className="section-title">
-                    {ITEM_TYPE_EMOJIS[type]} {ITEM_TYPE_LABELS[type]}s
+                    {ITEM_TYPE_LABELS[type]?.toUpperCase() || type.toUpperCase()}
                   </span>
                   <span className={styles.groupCount}>{group.length}</span>
                 </div>
@@ -124,7 +124,9 @@ function SearchContent() {
                       className={styles.resultCard}
                       id={`link-result-${item.id}`}
                     >
-                      <span className={styles.resultEmoji}>{ITEM_TYPE_EMOJIS[item.type]}</span>
+                      <span className={styles.typeBadge}>
+                        {ITEM_TYPE_LABELS[item.type]?.toUpperCase() || item.type.toUpperCase()}
+                      </span>
                       <div className={styles.resultInfo}>
                         <span className={styles.resultTitle}>
                           <Highlight text={item.title} query={query} />

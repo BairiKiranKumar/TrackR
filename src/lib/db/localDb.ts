@@ -47,7 +47,7 @@ interface TrackrDB extends DBSchema {
 // ─── DB Instance ───────────────────────────────────────────────────────────
 
 const DB_NAME = 'trackr-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<TrackrDB>> | null = null;
 
@@ -213,11 +213,13 @@ export async function clearAllData(): Promise<void> {
 
 export async function enqueueSyncOp(op: SyncOperation): Promise<void> {
   const db = await getDb();
+  if (!db.objectStoreNames.contains('sync_queue')) return;
   await db.put('sync_queue', op);
 }
 
 export async function getPendingSyncOps(limit = 50): Promise<SyncOperation[]> {
   const db = await getDb();
+  if (!db.objectStoreNames.contains('sync_queue')) return [];
   const all = await db.getAll('sync_queue');
   return all
     .filter(op => op.status === 'pending' || op.status === 'failed')
@@ -227,21 +229,25 @@ export async function getPendingSyncOps(limit = 50): Promise<SyncOperation[]> {
 
 export async function getAllSyncOps(): Promise<SyncOperation[]> {
   const db = await getDb();
+  if (!db.objectStoreNames.contains('sync_queue')) return [];
   return db.getAll('sync_queue');
 }
 
 export async function updateSyncOp(op: SyncOperation): Promise<void> {
   const db = await getDb();
+  if (!db.objectStoreNames.contains('sync_queue')) return;
   await db.put('sync_queue', op);
 }
 
 export async function deleteSyncOp(id: string): Promise<void> {
   const db = await getDb();
+  if (!db.objectStoreNames.contains('sync_queue')) return;
   await db.delete('sync_queue', id);
 }
 
 export async function clearSyncQueue(): Promise<void> {
   const db = await getDb();
+  if (!db.objectStoreNames.contains('sync_queue')) return;
   await db.clear('sync_queue');
 }
 

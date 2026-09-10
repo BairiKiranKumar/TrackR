@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Pin, BookOpen, FileText, Trash2 } from 'lucide-react';
+import { Search, Plus, Pin, BookOpen, FileText, Trash2, Edit3 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { Item } from '@/types';
 import { format } from 'date-fns';
@@ -41,9 +41,14 @@ export default function NotesPage() {
   async function handleDeleteNote(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`)) return;
-    await dataService.deleteItem(id);
-    await refreshItems();
+    const confirmed = window.confirm(`Are you sure you want to delete "${title || 'Untitled'}"?`);
+    if (!confirmed) return;
+    try {
+      await dataService.deleteItem(id);
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to delete note:', err);
+    }
   }
 
   return (
@@ -53,7 +58,7 @@ export default function NotesPage() {
         <button
           className="btn btn-primary btn-icon btn-round"
           onClick={createNote}
-          id="btn-notes-new"
+          id="btn-new-note"
           aria-label="New note"
         >
           <Plus size={20} />
@@ -65,8 +70,8 @@ export default function NotesPage() {
         <Search size={16} className={styles.searchIcon} />
         <input
           type="search"
+          placeholder="Search notes & tags..."
           className={styles.searchInput}
-          placeholder="Search notes…"
           value={query}
           onChange={e => setQuery(e.target.value)}
           id="input-notes-search"
@@ -80,13 +85,13 @@ export default function NotesPage() {
         id="btn-quick-note-prompt"
       >
         <span className={styles.quickNotePlaceholder}>
-          ✍️ What are you thinking about?
+          <Edit3 size={15} style={{ marginRight: 6 }} /> Write a quick note...
         </span>
       </button>
 
       {filtered.length === 0 && (
         <div className="empty-state">
-          <span className="empty-state__icon">📝</span>
+          <span className="empty-state__icon"><FileText size={36} /></span>
           <span className="empty-state__title">No notes yet</span>
           <span className="empty-state__subtitle">
             Tap the + button to start your first note. Use @mentions to link everything.
@@ -108,13 +113,14 @@ export default function NotesPage() {
               />
             ))}
           </div>
+          <div style={{ height: 16 }} />
         </>
       )}
 
       {rest.length > 0 && (
         <>
           {pinned.length > 0 && (
-            <div className="section-header" style={{ margin: '20px 0 8px' }}>
+            <div className="section-header" style={{ marginBottom: 8 }}>
               <span className="section-title">All Notes</span>
             </div>
           )}
@@ -138,41 +144,43 @@ function NoteCard({ note, onDelete }: { note: Item; onDelete?: (e: React.MouseEv
   const isJournal = note.type === 'journal';
 
   return (
-    <Link
-      href={`/notes/${note.id}`}
-      className={styles.noteCard}
-      id={`link-note-${note.id}`}
-    >
+    <div className={styles.noteCard} id={`note-card-${note.id}`}>
       <div className={styles.noteTop}>
-        <span className={styles.noteIcon}>
-          {isJournal ? <BookOpen size={15} /> : <FileText size={15} />}
-        </span>
-        <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
-        {note.pinned && <Pin size={12} className={styles.pinIcon} />}
+        <Link href={`/notes/${note.id}`} className={styles.noteTitleLink} id={`link-note-${note.id}`}>
+          <span className={styles.noteIcon}>
+            {isJournal ? <BookOpen size={15} /> : <FileText size={15} />}
+          </span>
+          <span className={styles.noteTitle}>{note.title || 'Untitled'}</span>
+          {note.pinned && <Pin size={12} className={styles.pinIcon} />}
+        </Link>
         {onDelete && (
           <button
+            type="button"
             className="btn btn-icon btn-ghost"
             onClick={onDelete}
+            id={`btn-delete-note-${note.id}`}
             title="Delete note"
-            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 2 }}
+            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 2, flexShrink: 0 }}
           >
             <Trash2 size={14} />
           </button>
         )}
       </div>
-      <p className={styles.notePreview}>{preview}</p>
-      <div className={styles.noteMeta}>
-        <span className={styles.noteDate}>
-          {format(new Date(note.updatedAt), 'MMM d')}
-        </span>
-        {note.tags.length > 0 && (
-          <div className={styles.noteTags}>
-            {note.tags.slice(0, 2).map(t => (
-              <span key={t} className={styles.noteTag}>#{t}</span>
-            ))}
-          </div>
-        )}
-      </div>
-    </Link>
+      <Link href={`/notes/${note.id}`} className={styles.noteBodyLink}>
+        <p className={styles.notePreview}>{preview}</p>
+        <div className={styles.noteMeta}>
+          <span className={styles.noteDate}>
+            {format(new Date(note.updatedAt), 'MMM d')}
+          </span>
+          {note.tags.length > 0 && (
+            <div className={styles.noteTags}>
+              {note.tags.slice(0, 2).map(t => (
+                <span key={t} className={styles.noteTag}>#{t}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Link>
+    </div>
   );
 }
