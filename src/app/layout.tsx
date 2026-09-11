@@ -32,7 +32,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         <ToastProvider>
           <ConfirmDialogProvider>
             <AuthProvider>
