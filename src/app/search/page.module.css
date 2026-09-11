@@ -30,7 +30,46 @@
 /* Search input */
 .searchWrap {
   position: relative;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-3);
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  scrollbar-width: none;
+}
+
+.filterRow::-webkit-scrollbar {
+  display: none;
+}
+
+.filterPill {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.filterPill:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.filterPillActive {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white !important;
+  font-weight: 600;
 }
 
 .searchIcon {

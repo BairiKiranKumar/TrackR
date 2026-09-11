@@ -317,11 +317,18 @@ export async function searchItems(query: string): Promise<Item[]> {
   const q = query.toLowerCase();
   return all
     .filter(item => !item.archived)
-    .filter(item =>
-      item.title.toLowerCase().includes(q) ||
-      item.content?.toLowerCase().includes(q) ||
-      item.tags.some(t => t.toLowerCase().includes(q))
-    )
+    .filter(item => {
+      if (item.title.toLowerCase().includes(q)) return true;
+      if (item.content?.toLowerCase().includes(q)) return true;
+      if (item.tags.some(t => t.toLowerCase().includes(q))) return true;
+      if (item.metadata && typeof item.metadata === 'object') {
+        for (const val of Object.values(item.metadata)) {
+          if (typeof val === 'string' && val.toLowerCase().includes(q)) return true;
+          if (Array.isArray(val) && val.some(v => typeof v === 'string' && v.toLowerCase().includes(q))) return true;
+        }
+      }
+      return false;
+    })
     .sort((a, b) => {
       const aTitle = a.title.toLowerCase().includes(q) ? 2 : 0;
       const bTitle = b.title.toLowerCase().includes(q) ? 2 : 0;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Search as SearchIcon, X } from 'lucide-react';
@@ -10,12 +10,25 @@ import { ItemTypeBadge } from '@/components/common/ItemTypeBadge';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import styles from './page.module.css';
 
+type FilterType = 'all' | 'project' | 'task' | 'note' | 'tracker' | 'goal' | 'finance';
+
+const FILTER_TABS: { id: FilterType; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'project', label: 'Projects' },
+  { id: 'task', label: 'Tasks' },
+  { id: 'note', label: 'Notes' },
+  { id: 'tracker', label: 'Trackers' },
+  { id: 'goal', label: 'Goals' },
+  { id: 'finance', label: 'Finance' },
+];
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [results, setResults] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); setSearched(false); return; }
@@ -31,10 +44,18 @@ function SearchContent() {
     return () => clearTimeout(timer);
   }, [query, doSearch]);
 
-  // Group results by type
-  const grouped = groupByType(results);
+  const filteredResults = useMemo(() => {
+    if (typeFilter === 'all') return results;
+    if (typeFilter === 'note') return results.filter(r => r.type === 'note' || r.type === 'journal');
+    if (typeFilter === 'tracker') return results.filter(r => r.type === 'tracker' || r.type === 'habit');
+    if (typeFilter === 'finance') return results.filter(r => r.type === 'expense' || r.type === 'income' || r.type === 'budget');
+    return results.filter(r => r.type === typeFilter);
+  }, [results, typeFilter]);
 
-  const GROUP_ORDER = ['project', 'task', 'note', 'expense', 'income', 'tracker', 'goal', 'habit', 'journal', 'budget'] as const;
+  // Group results by type
+  const grouped = groupByType(filteredResults);
+
+  const GROUP_ORDER = ['project', 'task', 'note', 'tracker', 'goal', 'habit', 'journal', 'expense', 'income', 'budget'] as const;
 
   function getHref(item: Item): string {
     if (item.type === 'note' || item.type === 'journal') return `/notes/${item.id}`;
@@ -64,6 +85,20 @@ function SearchContent() {
             <X size={16} />
           </button>
         )}
+      </div>
+
+      {/* Type Filter Pills */}
+      <div className={styles.filterRow}>
+        {FILTER_TABS.map(tab => (
+          <button
+            key={tab.id}
+            id={`filter-pill-${tab.id}`}
+            className={`${styles.filterPill} ${typeFilter === tab.id ? styles.filterPillActive : ''}`}
+            onClick={() => setTypeFilter(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Recent queries hint */}

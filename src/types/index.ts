@@ -13,9 +13,17 @@ export type ItemType =
   | 'budget'
   | 'journal';
 
-export type TrackerType = 'series' | 'streak' | 'goal';
+export type TrackerType = 'series' | 'streak' | 'goal' | 'numeric' | 'boolean' | 'duration';
 
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'cancelled';
+export type TaskStatus = 'inbox' | 'todo' | 'in_progress' | 'waiting' | 'done' | 'archived' | 'cancelled';
+
+export type TaskPriority = 'none' | 'low' | 'medium' | 'high' | 'urgent';
+
+export interface TaskRecurrence {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+  interval?: number;
+  daysOfWeek?: number[];
+}
 
 export type TransactionCategory =
   | 'food'
@@ -52,12 +60,16 @@ export interface NoteMetadata {
 
 export interface TaskMetadata {
   status: TaskStatus;
+  priority?: TaskPriority;
+  startDate?: string;
   dueDate?: string;
-  priority?: 'low' | 'medium' | 'high';
+  recurrence?: TaskRecurrence;
   completedAt?: string;
   inbox?: boolean;
   processed?: boolean;
   projectId?: string;
+  goalId?: string;
+  labels?: string[];
   [key: string]: unknown;
 }
 
@@ -88,13 +100,16 @@ export interface TrackerMetadata {
   completedDates?: string[]; // ISO dates for streaks
   currentStreak?: number;
   longestStreak?: number;
-  unit?: string;            // for goal: 'hours', '₹', 'km', etc.
-  target?: number;          // for goal
-  current?: number;         // for goal
+  unit?: string;            // 'hours', '₹', 'km', 'kg', 'min', 'pages', etc.
+  target?: number;          // for goal / numeric / duration
+  current?: number;         // current/latest numeric value
+  frequency?: 'daily' | 'weekly' | 'custom';
   emoji?: string;
   color?: string;           // accent color hex
   startDate?: string;       // ISO date
   projectId?: string;
+  goalId?: string;
+  entries?: TrackerDayMetadata[];
   [key: string]: unknown;
 }
 
@@ -104,6 +119,7 @@ export interface TrackerDayMetadata {
   date?: string;            // ISO date for streaks
   timeSpent?: number;       // minutes
   value?: number;           // numeric value if applicable
+  note?: string;
   completedAt?: string;
   [key: string]: unknown;
 }
@@ -153,11 +169,14 @@ export interface GoalMetadata {
   [key: string]: unknown;
 }
 
+export type ProjectStatus = 'active' | 'on_hold' | 'completed' | 'archived' | 'paused';
+
 export interface ProjectMetadata {
   emoji?: string;
   color?: string;
-  status?: 'active' | 'completed' | 'paused';
+  status?: ProjectStatus;
   targetDate?: string;
+  startDate?: string;
   description?: string;
   [key: string]: unknown;
 }
@@ -277,6 +296,8 @@ export interface ProjectContextSummary {
   tasks: Item[];
   openTasksCount: number;
   completedTasksCount: number;
+  progressPercentage: number | null; // null when 0 tasks ("No tasks yet")
+  nextActions: Item[];              // uncompleted tasks not blocked by any incomplete dependencies
   notes: Item[];
   trackers: Item[];
   expenses: Item[];
@@ -305,7 +326,16 @@ export interface Item {
 
 // ─── Relations ─────────────────────────────────────────────────────────────
 
-export type RelationType = 'references' | 'contains' | 'linked' | 'parent' | 'child';
+export type RelationType =
+  | 'references'
+  | 'contains'
+  | 'linked'
+  | 'parent'
+  | 'child'
+  | 'depends_on'
+  | 'blocks'
+  | 'belongs_to'
+  | 'related_to';
 
 export interface ItemRelation {
   id: string;

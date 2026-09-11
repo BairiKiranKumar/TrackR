@@ -40,6 +40,13 @@ export default function InboxPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkProjectModal, setShowBulkProjectModal] = useState(false);
+  const [showBulkTagModal, setShowBulkTagModal] = useState(false);
+  const [bulkTagInput, setBulkTagInput] = useState('');
+  const [bulkTagMode, setBulkTagMode] = useState<'add' | 'remove'>('add');
+
   // Link modal state
   const [linkingItem, setLinkingItem] = useState<Item | null>(null);
   const [linkSearchQuery, setLinkSearchQuery] = useState('');
@@ -75,6 +82,28 @@ export default function InboxPage() {
     });
   }, [inboxItems, filterType, searchQuery]);
 
+  const allFilteredSelected = useMemo(() => {
+    if (filteredItems.length === 0) return false;
+    return filteredItems.every(i => selectedIds.has(i.id));
+  }, [filteredItems, selectedIds]);
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredItems.map(i => i.id)));
+    }
+  }
+
+  function toggleSelectItem(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   // Candidate items to link with
   const candidateItems = useMemo(() => {
     if (!linkingItem) return [];
@@ -97,6 +126,11 @@ export default function InboxPage() {
     setProcessingId(id);
     try {
       await dataService.markItemProcessed(id);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await refreshItems();
     } finally {
       setProcessingId(null);
@@ -144,6 +178,11 @@ export default function InboxPage() {
     setProcessingId(id);
     try {
       await dataService.deleteItem(id);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await refreshItems();
     } finally {
       setProcessingId(null);
@@ -159,6 +198,105 @@ export default function InboxPage() {
       setLinkSearchQuery('');
     } catch (e) {
       console.error('Failed to link items', e);
+    }
+  }
+
+  // Bulk Handlers
+  async function handleBulkAssignProject(projectId: string) {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    try {
+      await dataService.bulkAssignProject(ids, projectId);
+      setSelectedIds(new Set());
+      setShowBulkProjectModal(false);
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk assign project:', err);
+    }
+  }
+
+  async function handleBulkAddTags(tagString: string) {
+    const ids = Array.from(selectedIds);
+    const tags = tagString.split(/[,\s]+/).map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+    if (!ids.length || !tags.length) return;
+    try {
+      await dataService.bulkAddTags(ids, tags);
+      setSelectedIds(new Set());
+      setShowBulkTagModal(false);
+      setBulkTagInput('');
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk add tags:', err);
+    }
+  }
+
+  async function handleBulkRemoveTags(tagString: string) {
+    const ids = Array.from(selectedIds);
+    const tags = tagString.split(/[,\s]+/).map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+    if (!ids.length || !tags.length) return;
+    try {
+      await dataService.bulkRemoveTags(ids, tags);
+      setSelectedIds(new Set());
+      setShowBulkTagModal(false);
+      setBulkTagInput('');
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk remove tags:', err);
+    }
+  }
+
+  async function handleBulkArchive() {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    try {
+      await dataService.bulkArchive(ids);
+      setSelectedIds(new Set());
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk archive:', err);
+    }
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    const confirmed = await confirm({
+      title: `Delete ${ids.length} selected item${ids.length > 1 ? 's' : ''}?`,
+      message: 'This will permanently remove these items and clean up their relationships.',
+      confirmLabel: 'Delete All',
+      danger: true,
+    });
+    if (!confirmed) return;
+    try {
+      await dataService.bulkDelete(ids);
+      setSelectedIds(new Set());
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk delete:', err);
+    }
+  }
+
+  async function handleBulkMarkProcessed() {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    try {
+      await dataService.bulkMarkProcessed(ids);
+      setSelectedIds(new Set());
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk mark processed:', err);
+    }
+  }
+
+  async function handleBulkConvertType(type: ItemType) {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    try {
+      await dataService.bulkConvertType(ids, type);
+      setSelectedIds(new Set());
+      await refreshItems();
+    } catch (err) {
+      console.error('Failed to bulk convert type:', err);
     }
   }
 
@@ -270,21 +408,50 @@ export default function InboxPage() {
           </div>
         ) : (
           <div className={styles.itemList}>
+            {filteredItems.length > 0 && (
+              <div className={styles.selectAllRow}>
+                <label className={styles.selectAllLabel}>
+                  <input
+                    type="checkbox"
+                    className={styles.itemCheckbox}
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAll}
+                    id="checkbox-inbox-select-all"
+                  />
+                  <span>Select all ({filteredItems.length})</span>
+                </label>
+                {selectedIds.size > 0 && (
+                  <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                    {selectedIds.size} selected
+                  </span>
+                )}
+              </div>
+            )}
+
             {filteredItems.map(item => {
               const assignedProjectId = (item.metadata as Record<string, unknown>)?.projectId as string | undefined;
               const assignedProject = assignedProjectId
                 ? projects.find(p => p.id === assignedProjectId)
                 : null;
               const isProcessing = processingId === item.id;
+              const isSelected = selectedIds.has(item.id);
 
               return (
                 <div
                   key={item.id}
-                  className={`${styles.inboxCard} ${isProcessing ? styles.inboxCardProcessing : ''}`}
+                  className={`${styles.inboxCard} ${isProcessing ? styles.inboxCardProcessing : ''} ${isSelected ? styles.inboxCardSelected : ''}`}
                 >
                   {/* Card Header */}
                   <div className={styles.cardHeader}>
                     <div className={styles.cardMetaRow}>
+                      <input
+                        type="checkbox"
+                        className={styles.itemCheckbox}
+                        checked={isSelected}
+                        onChange={() => toggleSelectItem(item.id)}
+                        id={`checkbox-inbox-item-${item.id}`}
+                        aria-label={`Select ${item.title}`}
+                      />
                       <ItemTypeBadge type={item.type} size="sm" />
 
                       {assignedProject && (
@@ -494,6 +661,197 @@ export default function InboxPage() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className={styles.bulkFloatingBar} role="toolbar" aria-label="Bulk actions">
+          <div className={styles.bulkCountPill} id="bulk-selected-count">
+            {selectedIds.size} selected
+          </div>
+
+          <button
+            className={styles.bulkBtn}
+            onClick={() => setShowBulkProjectModal(true)}
+            id="btn-bulk-project"
+            title="Assign Project"
+          >
+            <Folder size={14} />
+            <span>Project</span>
+          </button>
+
+          <button
+            className={styles.bulkBtn}
+            onClick={() => {
+              setBulkTagMode('add');
+              setShowBulkTagModal(true);
+            }}
+            id="btn-bulk-add-tags"
+            title="Add Tags"
+          >
+            <Tag size={14} />
+            <span>+ Tag</span>
+          </button>
+
+          <button
+            className={styles.bulkBtn}
+            onClick={() => {
+              setBulkTagMode('remove');
+              setShowBulkTagModal(true);
+            }}
+            id="btn-bulk-remove-tags"
+            title="Remove Tags"
+          >
+            <Tag size={14} />
+            <span>- Tag</span>
+          </button>
+
+          <button
+            className={styles.bulkBtn}
+            onClick={handleBulkMarkProcessed}
+            id="btn-bulk-processed"
+            title="Mark Triaged"
+          >
+            <CheckCircle2 size={14} />
+            <span>Triaged</span>
+          </button>
+
+          <select
+            className={styles.selectControl}
+            style={{ padding: '0.25rem 0.5rem', height: 28, fontSize: '0.75rem' }}
+            defaultValue=""
+            onChange={e => {
+              if (e.target.value) {
+                handleBulkConvertType(e.target.value as ItemType);
+                e.target.value = '';
+              }
+            }}
+            id="select-bulk-convert-type"
+            title="Convert selected items"
+          >
+            <option value="" disabled>Convert to…</option>
+            {CONVERTIBLE_TYPES.map(t => (
+              <option key={t} value={t}>
+                {ITEM_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </select>
+
+          <button
+            className={styles.bulkBtn}
+            onClick={handleBulkArchive}
+            id="btn-bulk-archive"
+            title="Archive selected"
+          >
+            <span>Archive</span>
+          </button>
+
+          <button
+            className={`${styles.bulkBtn} ${styles.bulkBtnDanger}`}
+            onClick={handleBulkDelete}
+            id="btn-bulk-delete"
+            title="Delete selected"
+          >
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </button>
+
+          <button
+            className={styles.bulkClearBtn}
+            onClick={() => setSelectedIds(new Set())}
+            id="btn-bulk-clear-selection"
+            aria-label="Clear selection"
+            title="Clear selection"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Project Modal */}
+      {showBulkProjectModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowBulkProjectModal(false)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Assign Project">
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitleRow}>
+                <Folder size={18} className={styles.modalTitleIcon} />
+                <h3 className={styles.modalTitle}>Assign Project</h3>
+              </div>
+              <button className={styles.closeBtn} onClick={() => setShowBulkProjectModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <p className={styles.modalDesc}>
+              Assign <strong>{selectedIds.size} items</strong> to a project:
+            </p>
+            <div className={styles.candidateList}>
+              {projects.length === 0 ? (
+                <div className={styles.emptyCandidates}>No active projects found. Create one first!</div>
+              ) : (
+                projects.map(p => (
+                  <button
+                    key={p.id}
+                    className={styles.candidateItem}
+                    onClick={() => handleBulkAssignProject(p.id)}
+                    id={`btn-bulk-choose-project-${p.id}`}
+                  >
+                    <div className={styles.candidateInfo}>
+                      <span className={styles.candidateEmoji}>📁</span>
+                      <div className={styles.candidateTexts}>
+                        <span className={styles.candidateTitle}>{p.title}</span>
+                      </div>
+                    </div>
+                    <ArrowRight size={15} className={styles.candidateArrow} />
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Tag Modal */}
+      {showBulkTagModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowBulkTagModal(false)}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={`${bulkTagMode === 'add' ? 'Add' : 'Remove'} Tags`}>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitleRow}>
+                <Tag size={18} className={styles.modalTitleIcon} />
+                <h3 className={styles.modalTitle}>{bulkTagMode === 'add' ? 'Add Tags' : 'Remove Tags'}</h3>
+              </div>
+              <button className={styles.closeBtn} onClick={() => setShowBulkTagModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <p className={styles.modalDesc}>
+              {bulkTagMode === 'add' ? 'Add tags to' : 'Remove tags from'} <strong>{selectedIds.size} selected items</strong> (comma-separated):
+            </p>
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (bulkTagMode === 'add') handleBulkAddTags(bulkTagInput);
+              else handleBulkRemoveTags(bulkTagInput);
+            }}>
+              <input
+                type="text"
+                className={styles.modalSearchInput}
+                placeholder="e.g. urgent, work, travel"
+                value={bulkTagInput}
+                onChange={e => setBulkTagInput(e.target.value)}
+                autoFocus
+                id="input-bulk-tag"
+                style={{ width: '100%', marginBottom: '1rem' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowBulkTagModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary btn-sm" id="btn-submit-bulk-tag">
+                  {bulkTagMode === 'add' ? 'Apply Tags' : 'Remove Tags'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

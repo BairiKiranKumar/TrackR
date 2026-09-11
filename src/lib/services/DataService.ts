@@ -11,7 +11,8 @@ import {
   BudgetItem, BudgetMetadata, BudgetProgress, DailyStreakState, Item, ItemType,
   ItemRelation, ActivityEvent, ActivityEventType, TransactionCategory,
   TransactionMetadata, WeeklyDigestSummary, ProjectContextSummary,
-  InboxMetadata, SyncStatus, RelationType
+  InboxMetadata, SyncStatus, RelationType, TaskMetadata, TaskRecurrence,
+  TrackerMetadata, TrackerDayMetadata
 } from '@/types';
 import { syncQueueService } from './SyncQueueService';
 import { storageModeService } from './StorageModeService';
@@ -33,6 +34,37 @@ function getPreviousDateKey(dateKey: string): string {
   const date = new Date(`${dateKey}T00:00:00`);
   date.setDate(date.getDate() - 1);
   return getLocalDateKey(date);
+}
+
+function computeNextDate(dateStr: string, recurrence: TaskRecurrence): string {
+  const cleanDateStr = dateStr.slice(0, 10);
+  const [y, m, d] = cleanDateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const recObj = typeof recurrence === 'string' ? { frequency: recurrence } : recurrence;
+  const interval = Math.max(1, recObj.interval || 1);
+
+  switch (recObj.frequency) {
+    case 'daily':
+      date.setDate(date.getDate() + interval);
+      break;
+    case 'weekly':
+      date.setDate(date.getDate() + interval * 7);
+      break;
+    case 'monthly':
+      date.setMonth(date.getMonth() + interval);
+      break;
+    case 'yearly':
+      date.setFullYear(date.getFullYear() + interval);
+      break;
+    case 'custom':
+      date.setDate(date.getDate() + interval);
+      break;
+  }
+
+  const yr = date.getFullYear();
+  const mo = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${day}`;
 }
 
 export type SyncStateInfo = {
@@ -484,16 +516,98 @@ class DataService {
     return updated;
   }
 
+  async bulkAssignProject(itemIds: string[], projectId: string): Promise<number> {
+    let count = 0;
+    for (const id of itemIds) {
+      const res = await this.assignItemProject(id, projectId);
+      if (res) count++;
+    }
+    return count;
+  }
+
+  async bulkAddTags(itemIds: string[], tagsToAdd: string[]): Promise<number> {
+    let count = 0;
+    const cleanTags = tagsToAdd.map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+    if (!cleanTags.length) return 0;
+    for (const id of itemIds) {
+      const item = await this.getItemById(id);
+      if (!item) continue;
+      const merged = Array.from(new Set([...item.tags, ...cleanTags]));
+      await this.updateItem(id, { tags: merged });
+      count++;
+    }
+    return count;
+  }
+
+  async bulkRemoveTags(itemIds: string[], tagsToRemove: string[]): Promise<number> {
+    let count = 0;
+    const toRemove = new Set(tagsToRemove.map(t => t.trim().replace(/^#/, '')).filter(Boolean));
+    if (!toRemove.size) return 0;
+    for (const id of itemIds) {
+      const item = await this.getItemById(id);
+      if (!item) continue;
+      const filtered = item.tags.filter(t => !toRemove.has(t));
+      await this.updateItem(id, { tags: filtered });
+      count++;
+    }
+    return count;
+  }
+
+  async bulkArchive(itemIds: string[]): Promise<number> {
+    let count = 0;
+    for (const id of itemIds) {
+      try {
+        await this.archiveItem(id);
+        count++;
+      } catch (err) {
+        console.warn(`Failed to archive item ${id}:`, err);
+      }
+    }
+    return count;
+  }
+
+  async bulkDelete(itemIds: string[]): Promise<number> {
+    let count = 0;
+    for (const id of itemIds) {
+      try {
+        await this.deleteItem(id);
+        count++;
+      } catch (err) {
+        console.warn(`Failed to delete item ${id}:`, err);
+      }
+    }
+    return count;
+  }
+
+  async bulkMarkProcessed(itemIds: string[]): Promise<number> {
+    let count = 0;
+    for (const id of itemIds) {
+      const res = await this.markItemProcessed(id);
+      if (res) count++;
+    }
+    return count;
+  }
+
+  async bulkConvertType(itemIds: string[], newType: ItemType): Promise<number> {
+    let count = 0;
+    for (const id of itemIds) {
+      const res = await this.convertItemType(id, newType);
+      if (res) count++;
+    }
+    return count;
+  }
+
   // ── Project Context Summary ────────────────────────────────────────────
 
   async getProjectContext(projectId: string): Promise<ProjectContextSummary | null> {
     const project = await getItemById(projectId);
     if (!project) return null;
 
-    const [outgoingRels, incomingRels, allItems] = await Promise.all([
+    const [outgoingRels, incomingRels, allItems, allActivity] = await Promise.all([
       getRelationsForSource(projectId),
       getRelationsForTarget(projectId),
       getAllItems(),
+      getRecentActivity(100),
     ]);
 
     const relatedItemIds = new Set<string>();
@@ -508,36 +622,69 @@ class DataService {
       return false;
     });
 
-    const tasks = projectItems.filter(i => i.type === 'task');
-    const openTasksCount = tasks.filter(t => {
-      const status = (t.metadata as { status?: string })?.status;
-      return status !== 'done' && status !== 'cancelled';
-    }).length;
-    const completedTasksCount = tasks.length - openTasksCount;
+    const tasks = projectItems.filter(i => i.type === 'task' && !i.archived);
+    const openTasks = tasks.filter(t => {
+      const status = (t.metadata as TaskMetadata)?.status;
+      return status !== 'done' && status !== 'cancelled' && status !== 'archived';
+    });
+    const openTasksCount = openTasks.length;
+    const completedTasksCount = tasks.filter(t => (t.metadata as TaskMetadata)?.status === 'done').length;
+    const progressPercentage = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : null;
 
-    const notes = projectItems.filter(i => i.type === 'note' || i.type === 'journal');
-    const expenses = projectItems.filter(i => i.type === 'expense');
+    // Calculate nextActions: uncompleted tasks whose dependencies (if any) are all done
+    const nextActions: Item[] = [];
+    for (const task of openTasks) {
+      const taskOutgoing = await getRelationsForSource(task.id);
+      const blockerRelIds = taskOutgoing
+        .filter(r => r.relationType === 'depends_on')
+        .map(r => r.targetId);
+
+      let isBlocked = false;
+      for (const blockerId of blockerRelIds) {
+        const blocker = allItems.find(i => i.id === blockerId);
+        if (blocker && !blocker.archived) {
+          const bStatus = (blocker.metadata as TaskMetadata)?.status;
+          if (bStatus !== 'done') {
+            isBlocked = true;
+            break;
+          }
+        }
+      }
+      if (!isBlocked) {
+        nextActions.push(task);
+      }
+    }
+
+    const notes = projectItems.filter(i => (i.type === 'note' || i.type === 'journal') && !i.archived);
+    const expenses = projectItems.filter(i => i.type === 'expense' && !i.archived);
     const totalExpenses = expenses.reduce((sum, e) => {
       const amt = (e.metadata as TransactionMetadata)?.amount;
       return sum + (typeof amt === 'number' ? amt : 0);
     }, 0);
-    const trackers = projectItems.filter(i => i.type === 'tracker');
-    const goals = projectItems.filter(i => i.type === 'goal');
+    const trackers = projectItems.filter(i => (i.type === 'tracker' || i.type === 'habit') && !i.archived);
+    const goals = projectItems.filter(i => i.type === 'goal' && !i.archived);
 
     const allRelations = [...outgoingRels, ...incomingRels];
+
+    // Project-specific activity: events where itemId is project or an attached item
+    const recentActivity = allActivity.filter(event =>
+      event.itemId === projectId || relatedItemIds.has(event.itemId)
+    ).slice(0, 20);
 
     return {
       project,
       tasks,
       openTasksCount,
       completedTasksCount,
+      progressPercentage,
+      nextActions,
       notes,
       expenses,
       totalExpenses,
       trackers,
       goals,
       linkedItems: projectItems,
-      recentActivity: [],
+      recentActivity,
       relations: allRelations,
     };
   }
@@ -763,20 +910,13 @@ class DataService {
 
   async completeTrackerDay(trackerId: string, dayIndex?: number, date?: string): Promise<Item | null> {
     const tracker = await getItemById(trackerId);
-    if (!tracker || tracker.type !== 'tracker') return null;
+    if (!tracker || (tracker.type !== 'tracker' && tracker.type !== 'habit')) return null;
 
-    const meta = tracker.metadata as {
-      trackerType: string;
-      completedDays?: number[];
-      completedDates?: string[];
-      currentStreak?: number;
-      longestStreak?: number;
-    };
-
-    const today = new Date().toISOString().split('T')[0];
+    const meta = tracker.metadata as TrackerMetadata;
+    const today = getLocalDateKey();
 
     if (meta.trackerType === 'series' && dayIndex !== undefined) {
-      const days = meta.completedDays ?? [];
+      const days = meta.completedDays ? [...meta.completedDays] : [];
       if (!days.includes(dayIndex)) {
         days.push(dayIndex);
         days.sort((a, b) => a - b);
@@ -789,22 +929,193 @@ class DataService {
       return updated;
     }
 
-    if (meta.trackerType === 'streak') {
-      const dates = meta.completedDates ?? [];
+    if (meta.trackerType === 'streak' || meta.trackerType === 'boolean') {
       const d = date ?? today;
-      if (!dates.includes(d)) {
-        dates.push(d);
-        dates.sort();
-      }
-      const streak = this.calculateStreakFromDates(dates);
-      const updated = await this.updateItem(trackerId, {
-        metadata: { ...meta, completedDates: dates, currentStreak: streak, longestStreak: Math.max(meta.longestStreak ?? 0, streak) },
-      });
-      if (updated) await this.logActivity('tracker_day_completed', updated, 'Streak day logged');
-      return updated;
+      return this.addTrackerEntry(trackerId, { date: d, value: 1, note: 'Completed' });
     }
 
     return null;
+  }
+
+  async addTrackerEntry(trackerId: string, entry: Omit<TrackerDayMetadata, 'trackerId'>): Promise<Item | null> {
+    const tracker = await getItemById(trackerId);
+    if (!tracker || (tracker.type !== 'tracker' && tracker.type !== 'habit')) return null;
+
+    const meta = (tracker.metadata || {}) as TrackerMetadata;
+    const dateKey = typeof entry.date === 'string' ? entry.date : getLocalDateKey();
+    const fullEntry: TrackerDayMetadata = {
+      trackerId,
+      date: dateKey,
+      completedAt: typeof entry.completedAt === 'string' ? entry.completedAt : new Date().toISOString(),
+      dayIndex: typeof entry.dayIndex === 'number' ? entry.dayIndex : undefined,
+      timeSpent: typeof entry.timeSpent === 'number' ? entry.timeSpent : undefined,
+      value: typeof entry.value === 'number' ? entry.value : undefined,
+      note: typeof entry.note === 'string' ? entry.note : undefined,
+    };
+
+    const existingEntries = [...(meta.entries || [])];
+    const idx = existingEntries.findIndex(e => e.date === dateKey);
+    if (idx >= 0) {
+      existingEntries[idx] = fullEntry;
+    } else {
+      existingEntries.push(fullEntry);
+    }
+    existingEntries.sort((a, b) => (a.date && b.date ? a.date.localeCompare(b.date) : 0));
+
+    // Update streak and dates
+    const dates = Array.from(new Set(existingEntries.map(e => e.date).filter(Boolean))) as string[];
+    dates.sort();
+    const currentStreak = this.calculateStreakFromDates(dates);
+    const longestStreak = Math.max(meta.longestStreak ?? 0, currentStreak);
+
+    const currentVal = typeof entry.value === 'number' ? entry.value : (typeof meta.current === 'number' ? meta.current : undefined);
+
+    const updatedMeta: TrackerMetadata = {
+      ...meta,
+      entries: existingEntries,
+      completedDates: dates,
+      currentStreak,
+      longestStreak,
+      current: currentVal,
+    };
+
+    const updated = await this.updateItem(trackerId, { metadata: updatedMeta });
+    if (updated) {
+      await this.logActivity('tracker_day_completed', updated, `Logged ${entry.value !== undefined ? entry.value : ''} for ${dateKey}`);
+    }
+
+    // Connect to goal if linked
+    if (meta.goalId && entry.value !== undefined) {
+      const goal = await getItemById(meta.goalId);
+      if (goal && goal.type === 'goal') {
+        const gMeta = goal.metadata as Record<string, unknown>;
+        const totalTrackerVal = existingEntries.reduce((sum, e) => sum + (e.value ?? 0), 0);
+        await this.updateItem(goal.id, {
+          metadata: {
+            ...gMeta,
+            currentAmount: totalTrackerVal,
+          },
+        });
+      }
+    }
+
+    return updated;
+  }
+
+  async updateTrackerEntry(trackerId: string, entryDate: string, updates: Partial<TrackerDayMetadata>): Promise<Item | null> {
+    const tracker = await getItemById(trackerId);
+    if (!tracker || !tracker.metadata) return null;
+    const meta = tracker.metadata as TrackerMetadata;
+    const entries = [...(meta.entries || [])];
+    const idx = entries.findIndex(e => e.date === entryDate);
+    if (idx < 0) return null;
+
+    entries[idx] = { ...entries[idx], ...updates };
+    const dates = Array.from(new Set(entries.map(e => e.date).filter(Boolean))) as string[];
+    dates.sort();
+    const currentStreak = this.calculateStreakFromDates(dates);
+
+    return this.updateItem(trackerId, {
+      metadata: {
+        ...meta,
+        entries,
+        completedDates: dates,
+        currentStreak,
+        longestStreak: Math.max(meta.longestStreak ?? 0, currentStreak),
+        current: updates.value !== undefined ? updates.value : meta.current,
+      },
+    });
+  }
+
+  async deleteTrackerEntry(trackerId: string, entryDate: string): Promise<Item | null> {
+    const tracker = await getItemById(trackerId);
+    if (!tracker || !tracker.metadata) return null;
+    const meta = tracker.metadata as TrackerMetadata;
+    const entries = (meta.entries || []).filter(e => e.date !== entryDate);
+    const dates = Array.from(new Set(entries.map(e => e.date).filter(Boolean))) as string[];
+    dates.sort();
+    const currentStreak = this.calculateStreakFromDates(dates);
+
+    return this.updateItem(trackerId, {
+      metadata: {
+        ...meta,
+        entries,
+        completedDates: dates,
+        currentStreak,
+        current: entries.length > 0 ? entries[entries.length - 1].value : undefined,
+      },
+    });
+  }
+
+  async getTrackerEntries(trackerId: string): Promise<TrackerDayMetadata[]> {
+    const tracker = await getItemById(trackerId);
+    if (!tracker) return [];
+    const meta = tracker.metadata as TrackerMetadata;
+    return (meta.entries || []).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+
+  async getTrackerStats(trackerId: string): Promise<{
+    hasSufficientData: boolean;
+    count: number;
+    latestValue?: number;
+    averageValue?: number;
+    minValue?: number;
+    maxValue?: number;
+    trend?: 'up' | 'down' | 'stable';
+    trendMessage?: string;
+  }> {
+    const entries = await this.getTrackerEntries(trackerId);
+    const numericEntries = entries
+      .filter(e => typeof e.value === 'number')
+      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+    if (numericEntries.length < 3) {
+      return {
+        hasSufficientData: false,
+        count: numericEntries.length,
+        latestValue: numericEntries[numericEntries.length - 1]?.value,
+        trendMessage: `Add ${Math.max(0, 3 - numericEntries.length)} more entries to see a trend.`,
+      };
+    }
+
+    const values = numericEntries.map(e => e.value as number);
+    const count = values.length;
+    const sum = values.reduce((a, b) => a + b, 0);
+    const averageValue = Math.round((sum / count) * 100) / 100;
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const latestValue = values[values.length - 1];
+
+    const mid = Math.floor(count / 2);
+    const firstHalfAvg = values.slice(0, mid).reduce((a, b) => a + b, 0) / mid;
+    const secondHalfAvg = values.slice(mid).reduce((a, b) => a + b, 0) / (count - mid);
+
+    let trend: 'up' | 'down' | 'stable' = 'stable';
+    const delta = latestValue - values[0];
+    const diffPct = firstHalfAvg !== 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0;
+    if (diffPct > 0.5 || delta > 0.1) trend = 'up';
+    else if (diffPct < -0.5 || delta < -0.1) trend = 'down';
+
+    return {
+      hasSufficientData: true,
+      count,
+      latestValue,
+      averageValue,
+      minValue,
+      maxValue,
+      trend,
+      trendMessage: trend === 'up' ? 'Trending upward' : trend === 'down' ? 'Trending downward' : 'Stable trajectory',
+    };
+  }
+
+  async connectTrackerToGoal(trackerId: string, goalId: string): Promise<void> {
+    const tracker = await getItemById(trackerId);
+    if (!tracker) return;
+    const meta = (tracker.metadata || {}) as TrackerMetadata;
+    await this.updateItem(trackerId, {
+      metadata: { ...meta, goalId },
+    });
+    await this.linkItems(trackerId, goalId, 'related_to');
   }
 
   private calculateSeriesStreak(completedDays: number[]): number {
@@ -917,26 +1228,209 @@ class DataService {
     return streak;
   }
 
-  // ── Task helpers ───────────────────────────────────────────────────────
+  // ── Task Dependencies & Cycles ──────────────────────────────────────────
 
-  async getTodayTasks(): Promise<Item[]> {
-    const tasks = await getItemsByType('task');
-    const today = new Date().toISOString().split('T')[0];
-    return tasks.filter(t => {
-      const meta = t.metadata as { status?: string; dueDate?: string };
-      return meta.status !== 'done' && meta.status !== 'cancelled' &&
-        (meta.dueDate === today || !meta.dueDate);
-    });
+  async addTaskDependency(taskId: string, dependsOnTaskId: string): Promise<ItemRelation> {
+    if (taskId === dependsOnTaskId) {
+      throw new Error('A task cannot depend on itself');
+    }
+    const [task, depTask] = await Promise.all([
+      getItemById(taskId),
+      getItemById(dependsOnTaskId),
+    ]);
+    if (!task || !depTask) {
+      throw new Error('Both tasks must exist to create a dependency');
+    }
+
+    // Check if dependency already exists
+    const existingRels = await getRelationsForSource(taskId);
+    const alreadyDep = existingRels.find(
+      r => r.targetId === dependsOnTaskId && r.relationType === 'depends_on'
+    );
+    if (alreadyDep) return alreadyDep;
+
+    // Cycle detection: traverse from dependsOnTaskId along depends_on relations.
+    // If taskId is reachable, adding this edge would form a circular dependency.
+    const visited = new Set<string>();
+    const queue = [dependsOnTaskId];
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      if (curr === taskId) {
+        throw new Error(`Circular dependency detected: task "${taskId}" is already an upstream dependency of "${dependsOnTaskId}"`);
+      }
+      if (!visited.has(curr)) {
+        visited.add(curr);
+        const outgoing = await getRelationsForSource(curr);
+        for (const r of outgoing) {
+          if (r.relationType === 'depends_on') {
+            queue.push(r.targetId);
+          }
+        }
+      }
+    }
+
+    return this.linkItems(taskId, dependsOnTaskId, 'depends_on');
   }
 
-  async completeTask(taskId: string): Promise<Item | null> {
+  async removeTaskDependency(taskId: string, dependsOnTaskId: string): Promise<void> {
+    const outgoing = await getRelationsForSource(taskId);
+    const rel = outgoing.find(r => r.targetId === dependsOnTaskId && r.relationType === 'depends_on');
+    if (rel) {
+      await deleteRelation(rel.id);
+      await syncQueueService.enqueue('item_relation', rel.id, 'delete');
+    }
+  }
+
+  async getTaskDependencies(taskId: string): Promise<{ blockedBy: Item[]; blocking: Item[] }> {
+    const [outgoing, incoming, allItems] = await Promise.all([
+      getRelationsForSource(taskId),
+      getRelationsForTarget(taskId),
+      getAllItems(),
+    ]);
+    const itemMap = new Map(allItems.map(i => [i.id, i]));
+
+    const blockedBy = outgoing
+      .filter(r => r.relationType === 'depends_on')
+      .map(r => itemMap.get(r.targetId))
+      .filter((i): i is Item => Boolean(i));
+
+    const blocking = incoming
+      .filter(r => r.relationType === 'depends_on')
+      .map(r => itemMap.get(r.sourceId))
+      .filter((i): i is Item => Boolean(i));
+
+    return { blockedBy, blocking };
+  }
+
+  // ── Task helpers & Views ───────────────────────────────────────────────
+
+  async getTasksByView(view: 'today' | 'upcoming' | 'overdue' | 'completed' | 'all'): Promise<Item[]> {
+    const tasks = await getItemsByType('task');
+    const today = getLocalDateKey();
+    const activeTasks = tasks.filter(t => !t.archived);
+
+    switch (view) {
+      case 'today':
+        return activeTasks.filter(t => {
+          const meta = t.metadata as TaskMetadata;
+          if (meta.status === 'done' || meta.status === 'cancelled' || meta.status === 'archived') return false;
+          const dueKey = meta.dueDate ? meta.dueDate.slice(0, 10) : undefined;
+          return dueKey === today || (dueKey && dueKey < today) || meta.status === 'in_progress';
+        }).sort((a, b) => {
+          const aMeta = a.metadata as TaskMetadata;
+          const bMeta = b.metadata as TaskMetadata;
+          const aDue = aMeta.dueDate || '9999';
+          const bDue = bMeta.dueDate || '9999';
+          return aDue.localeCompare(bDue);
+        });
+
+      case 'upcoming':
+        return activeTasks.filter(t => {
+          const meta = t.metadata as TaskMetadata;
+          if (meta.status === 'done' || meta.status === 'cancelled' || meta.status === 'archived') return false;
+          const dueKey = meta.dueDate ? meta.dueDate.slice(0, 10) : undefined;
+          return Boolean(dueKey && dueKey > today);
+        }).sort((a, b) => {
+          const aMeta = a.metadata as TaskMetadata;
+          const bMeta = b.metadata as TaskMetadata;
+          return (aMeta.dueDate || '').localeCompare(bMeta.dueDate || '');
+        });
+
+      case 'overdue':
+        return activeTasks.filter(t => {
+          const meta = t.metadata as TaskMetadata;
+          if (meta.status === 'done' || meta.status === 'cancelled' || meta.status === 'archived') return false;
+          const dueKey = meta.dueDate ? meta.dueDate.slice(0, 10) : undefined;
+          return Boolean(dueKey && dueKey < today);
+        }).sort((a, b) => {
+          const aMeta = a.metadata as TaskMetadata;
+          const bMeta = b.metadata as TaskMetadata;
+          return (aMeta.dueDate || '').localeCompare(bMeta.dueDate || '');
+        });
+
+      case 'completed':
+        return activeTasks.filter(t => {
+          const meta = t.metadata as TaskMetadata;
+          return meta.status === 'done';
+        }).sort((a, b) => {
+          const aTime = (a.metadata as TaskMetadata).completedAt || a.updatedAt;
+          const bTime = (b.metadata as TaskMetadata).completedAt || b.updatedAt;
+          return new Date(bTime).getTime() - new Date(aTime).getTime();
+        });
+
+      case 'all':
+      default:
+        return activeTasks;
+    }
+  }
+
+  async getTodayTasks(): Promise<Item[]> {
+    return this.getTasksByView('today');
+  }
+
+  async getUpcomingTasks(): Promise<Item[]> {
+    return this.getTasksByView('upcoming');
+  }
+
+  async getOverdueTasks(): Promise<Item[]> {
+    return this.getTasksByView('overdue');
+  }
+
+  async getCompletedTasks(): Promise<Item[]> {
+    return this.getTasksByView('completed');
+  }
+
+  async completeTask(taskId: string): Promise<(Item & { nextTask?: Item }) | null> {
     const task = await getItemById(taskId);
     if (!task) return null;
+    const meta = (task.metadata || {}) as TaskMetadata;
+    const now = new Date().toISOString();
     const updated = await this.updateItem(taskId, {
-      metadata: { ...task.metadata, status: 'done', completedAt: new Date().toISOString() },
+      metadata: { ...meta, status: 'done', completedAt: now },
     });
-    if (updated) await this.logActivity('task_completed', updated, 'Task completed');
-    return updated;
+    if (!updated) return null;
+    await this.logActivity('task_completed', updated, 'Task completed');
+
+    let nextTask: Item | undefined;
+    const recurrenceConfig = typeof meta.recurrence === 'string'
+      ? (meta.recurrence !== 'none' ? { frequency: meta.recurrence as 'daily' | 'weekly' | 'monthly' | 'yearly' } : undefined)
+      : meta.recurrence;
+
+    if (recurrenceConfig?.frequency) {
+      const baseDate = meta.dueDate || getLocalDateKey();
+      const nextDueDate = computeNextDate(baseDate, recurrenceConfig);
+
+      // Deterministic recurrence: check if next occurrence already exists
+      const allTasks = await getItemsByType('task');
+      const alreadyExists = allTasks.some(t => {
+        if (t.archived || t.title !== task.title) return false;
+        const tMeta = t.metadata as TaskMetadata;
+        return tMeta.dueDate === nextDueDate && tMeta.status !== 'done' && tMeta.status !== 'cancelled';
+      });
+
+      if (!alreadyExists) {
+        const nextStartDate = meta.startDate ? computeNextDate(meta.startDate, recurrenceConfig) : undefined;
+        nextTask = await this.createItem({
+          type: 'task',
+          title: task.title,
+          content: task.content,
+          tags: [...task.tags],
+          metadata: {
+            ...meta,
+            status: 'todo',
+            dueDate: nextDueDate,
+            startDate: nextStartDate,
+            completedAt: undefined,
+          },
+        });
+
+        if (meta.projectId) {
+          await this.linkItems(nextTask.id, meta.projectId, 'child');
+        }
+      }
+    }
+
+    return { ...updated, nextTask };
   }
 }
 

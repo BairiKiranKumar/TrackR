@@ -3,12 +3,13 @@
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, CheckSquare, Star, Circle, CheckCircle2, Trash2, Target, Folder, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Star, Trash2, Target, Folder, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { Item, TrackerMetadata, TaskMetadata } from '@/types';
 import { dataService } from '@/lib/services/DataService';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
+import { TaskListView } from '@/components/tasks/TaskListView';
 import styles from './page.module.css';
 
 type Tab = 'tasks' | 'trackers' | 'goals' | 'projects';
@@ -34,11 +35,6 @@ function TrackContent() {
     { id: 'goals',    label: 'Goals',    count: goals.length },
     { id: 'projects', label: 'Projects', count: projects.length },
   ];
-
-  async function handleCompleteTask(taskId: string) {
-    await dataService.completeTask(taskId);
-    await refreshItems();
-  }
 
   async function handleDeleteItem(e: React.MouseEvent, id: string, title: string) {
     e.preventDefault();
@@ -89,51 +85,8 @@ function TrackContent() {
 
       {/* Tasks tab */}
       {activeTab === 'tasks' && (
-        <div className={styles.list}>
-          {tasks.length === 0 && (
-            <div className="empty-state">
-              <span className="empty-state__icon"><CheckSquare size={40} /></span>
-              <span className="empty-state__title">No tasks yet</span>
-              <span className="empty-state__subtitle">Add tasks to track what needs to be done. Use @mentions to link them to projects.</span>
-            </div>
-          )}
-          {tasks.map(task => {
-            const meta = task.metadata as TaskMetadata;
-            const isDone = meta.status === 'done';
-            return (
-              <div key={task.id} className={`${styles.taskRow} ${isDone ? styles.taskDone : ''}`}>
-                <button
-                  type="button"
-                  className={styles.checkBtn}
-                  onClick={() => !isDone && handleCompleteTask(task.id)}
-                  id={`btn-complete-${task.id}`}
-                  aria-label={isDone ? 'Completed' : 'Mark complete'}
-                >
-                  {isDone
-                    ? <CheckCircle2 size={22} color="var(--color-success)" />
-                    : <Circle size={22} color="var(--text-tertiary)" />
-                  }
-                </button>
-                <Link href={`/track/${task.id}`} className={styles.taskInfo} id={`link-task-${task.id}`}>
-                  <span className={styles.taskTitle}>{task.title}</span>
-                  {meta.dueDate && (
-                    <span className={styles.taskDue}>{meta.dueDate}</span>
-                  )}
-                </Link>
-                {meta.priority === 'high' && <span className="badge badge-danger">!</span>}
-                <button
-                  type="button"
-                  className="btn btn-icon btn-ghost"
-                  onClick={(e) => handleDeleteItem(e, task.id, task.title)}
-                  id={`btn-delete-task-${task.id}`}
-                  title="Delete task"
-                  style={{ color: 'var(--text-tertiary)', padding: 4, flexShrink: 0 }}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            );
-          })}
+        <div style={{ marginTop: '0.75rem' }}>
+          <TaskListView view="all" showTabs={true} />
         </div>
       )}
 

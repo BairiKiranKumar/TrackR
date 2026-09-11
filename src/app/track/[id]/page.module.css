@@ -687,3 +687,201 @@
   margin-left: 0.5rem;
 }
 
+/* ─── Task Lifecycle & Dependencies ────────────────────────────────────── */
+
+.lifecycleGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.lifecycleField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.lifecycleLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lifecycleSelect, .lifecycleInput {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8125rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.lifecycleSelect:focus, .lifecycleInput:focus {
+  border-color: var(--accent-primary, #6366f1);
+}
+
+.depList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.depItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8125rem;
+}
+
+.depLink {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.depLink:hover {
+  color: var(--accent-primary, #6366f1);
+}
+
+.depRemoveBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.depRemoveBtn:hover {
+  color: var(--color-danger, #ef4444);
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm, 6px);
+  color: #ef4444;
+  font-size: 0.8125rem;
+  margin-bottom: 0.75rem;
+}
+
+/* ─── Tracker Logging & Entries ────────────────────────────────────────── */
+
+.trackerLogCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md, 8px);
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.trackerLogForm {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.trendBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.trendUp {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.trendDown {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.trendStable {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+}
+
+.entryHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.entryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8125rem;
+}
+
+.entryVal {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.entryDate {
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+}
+
+.entryNote {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+/* ─── Project Activity ─────────────────────────────────────────────────── */
+
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8125rem;
+}
+
+.activityTitle {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.activityTime {
+  color: var(--text-tertiary);
+  font-size: 0.725rem;
+}
+
+
