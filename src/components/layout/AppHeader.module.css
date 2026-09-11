@@ -23,6 +23,33 @@
   min-width: 0;
 }
 
+/* Mobile menu (burger) button — opens the SideNav drawer. Hidden on desktop,
+   where the sidebar is already permanently visible. */
+.menuBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.menuBtn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+
+@media (min-width: 768px) {
+  .menuBtn {
+    display: none;
+  }
+}
+
 /* Logo */
 .logoBtn {
   display: flex;

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, CheckCircle2, CircleAlert, ChevronDown, Flame, LogOut, RefreshCw, Settings, Wifi, WifiOff } from 'lucide-react';
+import { Bell, CheckCircle2, CircleAlert, ChevronDown, Flame, LogOut, Menu, RefreshCw, Settings, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { dataService } from '@/lib/services/DataService';
@@ -17,7 +17,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, userConfig, signOut, isConfigured } = useAuth();
-  const { dailyStreak, items } = useAppContext();
+  const { dailyStreak, items, toggleMobileNav } = useAppContext();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncDot>('idle');
@@ -116,6 +116,16 @@ export function AppHeader() {
   return (
     <header className={styles.header} id="app-header">
       <div className={styles.brandGroup}>
+        <button
+          className={styles.menuBtn}
+          onClick={toggleMobileNav}
+          id="btn-header-menu"
+          aria-label="Open menu"
+          aria-controls="side-nav"
+        >
+          <Menu size={20} />
+        </button>
+
         <button className={styles.logoBtn} onClick={() => router.push('/')} id="btn-header-logo">
           <span className={styles.logoMark}>T</span>
           <span className={styles.logoText}>TRACKR</span>

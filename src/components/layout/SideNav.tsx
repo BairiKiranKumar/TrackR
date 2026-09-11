@@ -15,8 +15,9 @@ import {
   ArrowLeftRight,
   Settings,
   Plus,
+  X,
 } from 'lucide-react';
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { QuickAdd } from './QuickAdd';
@@ -59,7 +60,7 @@ function SideNavInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { items } = useAppContext();
+  const { items, mobileNavOpen, closeMobileNav } = useAppContext();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const inboxCount = useMemo(() => {
@@ -69,6 +70,22 @@ function SideNavInner() {
       return meta?.inbox === true && !meta?.processed;
     }).length;
   }, [items]);
+
+  // Close the mobile drawer whenever the route (or its query, e.g. Track's
+  // ?tab=) changes — navigating is the expected way to dismiss it.
+  useEffect(() => {
+    closeMobileNav();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, searchParams.toString()]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeMobileNav();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavOpen, closeMobileNav]);
 
   if (!user || pathname.startsWith('/auth')) return null;
 
@@ -105,6 +122,7 @@ function SideNavInner() {
               href={item.href}
               className={`${styles.navItem} ${active ? styles.active : ''}`}
               id={item.id}
+              onClick={closeMobileNav}
             >
               <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
               <span>{item.label}</span>
@@ -120,10 +138,36 @@ function SideNavInner() {
 
   return (
     <>
-      <aside className={styles.sidebar} id="side-nav">
+      {mobileNavOpen && (
+        <div className={`overlay ${styles.mobileOverlay}`} onClick={closeMobileNav} />
+      )}
+      <aside
+        className={`${styles.sidebar} ${mobileNavOpen ? styles.mobileOpen : ''}`}
+        id="side-nav"
+        role={mobileNavOpen ? 'dialog' : undefined}
+        aria-modal={mobileNavOpen ? true : undefined}
+        aria-label={mobileNavOpen ? 'Navigation menu' : undefined}
+      >
+        {mobileNavOpen && (
+          <div className={styles.drawerHeader}>
+            <span className={styles.drawerHeaderTitle}>
+              <span className={styles.drawerLogoMark}>T</span>
+              TRACKR
+            </span>
+            <button
+              className={styles.drawerCloseBtn}
+              onClick={closeMobileNav}
+              aria-label="Close menu"
+              id="btn-sidenav-close"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
         <button
           className={styles.quickAddBtn}
-          onClick={() => setQuickAddOpen(true)}
+          onClick={() => { setQuickAddOpen(true); closeMobileNav(); }}
           id="btn-sidenav-quickadd"
           title="Quick Capture (Cmd/Ctrl + K)"
         >
@@ -149,6 +193,7 @@ function SideNavInner() {
                   href={item.href}
                   className={`${styles.navItem} ${active ? styles.active : ''}`}
                   id={item.id}
+                  onClick={closeMobileNav}
                 >
                   <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
                   <span>{item.label}</span>
