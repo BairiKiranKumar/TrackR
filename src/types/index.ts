@@ -182,6 +182,7 @@ export type SyncOperationType =
   | 'update'
   | 'delete'
   | 'upsert'
+  | 'archive'
   | 'clear'
   | 'relation_create'
   | 'relation_delete'
@@ -200,6 +201,38 @@ export interface SyncOperation {
   lastAttemptAt?: string;
   lastError?: string;
   status: SyncStatus;
+}
+
+// ─── Observability & Conflict Resolution ───────────────────────────────────
+
+export type DiagnosticCategory =
+  | 'sync_failure'
+  | 'auth_failure'
+  | 'storage_failure'
+  | 'import_failure'
+  | 'export_failure'
+  | 'integration_failure'
+  | 'conflict_detected';
+
+export interface DiagnosticEvent {
+  id: string;
+  category: DiagnosticCategory;
+  message: string;
+  entityType?: string;
+  entityId?: string;
+  details?: Record<string, unknown>;
+  timestamp: string;
+}
+
+export interface ConflictResolution {
+  itemId: string;
+  localVersion?: number;
+  remoteVersion?: number;
+  localUpdatedAt: string;
+  remoteUpdatedAt: string;
+  strategy: 'remote_applied' | 'local_retained' | 'merged';
+  backupCreated: boolean;
+  timestamp: string;
 }
 
 // ─── Capability & Extension Interfaces ─────────────────────────────────────
@@ -264,6 +297,7 @@ export interface Item {
   tags: string[];
   archived: boolean;
   pinned?: boolean;
+  version?: number;         // monotonic version counter for deterministic conflict resolution
   createdAt: string;        // ISO
   updatedAt: string;        // ISO
   metadata: ItemMetadata;

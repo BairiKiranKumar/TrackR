@@ -1,4 +1,4 @@
-import test, { describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { MoneyDetectionService } from '../lib/services/MoneyDetectionService';
 import { LocalCaptureProcessor } from '../lib/services/CaptureService';

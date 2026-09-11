@@ -26,6 +26,7 @@ create table if not exists public.items (
   tags         text[] default '{}',
   pinned       boolean default false,
   archived     boolean default false,
+  version      integer default 1,
   created_at   timestamptz default now(),
   updated_at   timestamptz default now()
 );
@@ -80,6 +81,9 @@ create policy "item_relations_insert_own" on public.item_relations for insert wi
 drop policy if exists "item_relations_delete_own" on public.item_relations;
 create policy "item_relations_delete_own" on public.item_relations for delete using (auth.uid() = user_id);
 
+drop policy if exists "item_relations_update_own" on public.item_relations;
+create policy "item_relations_update_own" on public.item_relations for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- Defense-in-depth: reject a relation whose source or target item belongs
 -- to a different user than the relation's own user_id, even though RLS on
 -- `items` already means a user can't normally *see* another user's item id
@@ -133,8 +137,38 @@ create policy "activity_events_select_own" on public.activity_events for select 
 drop policy if exists "activity_events_insert_own" on public.activity_events;
 create policy "activity_events_insert_own" on public.activity_events for insert with check (auth.uid() = user_id);
 
+drop policy if exists "activity_events_update_own" on public.activity_events;
+create policy "activity_events_update_own" on public.activity_events for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 drop policy if exists "activity_events_delete_own" on public.activity_events;
 create policy "activity_events_delete_own" on public.activity_events for delete using (auth.uid() = user_id);
+
+-- ── diagnostic_events (observability & audit telemetry) ──────────────────
+
+create table if not exists public.diagnostic_events (
+  id           text primary key,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  category     text not null,
+  message      text not null,
+  entity_type  text,
+  entity_id    text,
+  details      jsonb default '{}',
+  created_at   timestamptz default now()
+);
+
+create index if not exists diagnostic_events_user_id_idx on public.diagnostic_events(user_id);
+create index if not exists diagnostic_events_category_idx on public.diagnostic_events(category);
+
+alter table public.diagnostic_events enable row level security;
+
+drop policy if exists "diagnostic_events_select_own" on public.diagnostic_events;
+create policy "diagnostic_events_select_own" on public.diagnostic_events for select using (auth.uid() = user_id);
+
+drop policy if exists "diagnostic_events_insert_own" on public.diagnostic_events;
+create policy "diagnostic_events_insert_own" on public.diagnostic_events for insert with check (auth.uid() = user_id);
+
+drop policy if exists "diagnostic_events_delete_own" on public.diagnostic_events;
+create policy "diagnostic_events_delete_own" on public.diagnostic_events for delete using (auth.uid() = user_id);
 
 -- ── user_settings ───────────────────────────────────────────────────────
 -- Reserved for future use (e.g. syncing non-sensitive preferences across

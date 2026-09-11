@@ -8,6 +8,7 @@ import {
 import { SyncOperation, SyncOperationType, SyncStatus, Item, ItemRelation } from '@/types';
 import { storageModeService } from './StorageModeService';
 import { RemoteStorageProvider } from '@/lib/storage/RemoteStorageProvider';
+import { observabilityService } from './ObservabilityService';
 
 // After this many failed attempts, an operation stops auto-retrying and is
 // marked 'needs_attention' instead of 'failed' — it is never discarded, just
@@ -171,6 +172,18 @@ class SyncQueueService {
           // and the local item/relation data it describes is untouched either way.
           op.status = op.retryCount >= MAX_RETRIES ? 'needs_attention' : 'failed';
           await updateSyncOp(op);
+
+          try {
+            await observabilityService.logEvent({
+              category: 'sync_failure',
+              message: `Sync ${op.operation} on ${op.entityType} ${op.entityId} failed: ${errorMsg}`,
+              entityType: op.entityType,
+              entityId: op.entityId,
+              details: { operation: op.operation, retryCount: op.retryCount, status: op.status },
+            });
+          } catch {
+            // Ignore observability logging error to prevent blocking sync loop
+          }
         }
       }
     } finally {
@@ -183,7 +196,8 @@ class SyncQueueService {
     switch (op.operation) {
       case 'create':
       case 'update':
-      case 'upsert': {
+      case 'upsert':
+      case 'archive': {
         if (op.entityType === 'item' && op.payload) {
           await provider.upsertItem(op.payload as Item);
         } else if (op.entityType === 'item_relation' && op.payload) {

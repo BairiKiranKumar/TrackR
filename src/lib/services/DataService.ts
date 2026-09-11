@@ -4,7 +4,7 @@ import {
   saveRelation, getRecentActivity,
   saveActivityEvent, searchItems, getSetting, setSetting, getAllRelations,
   deleteItem as localDeleteItem, deleteRelationsForItem, clearAllData as localClearAllData,
-  deleteRelation, deleteRelationByPair, getAllActivityEvents
+  deleteRelation, deleteRelationByPair, getAllActivityEvents, getAllSyncOps
 } from '@/lib/db/localDb';
 import { buildRelationsFromText } from './ReferenceParser';
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/types';
 import { syncQueueService } from './SyncQueueService';
 import { storageModeService } from './StorageModeService';
+import { observabilityService } from './ObservabilityService';
 import { createSampleProjectDataset } from '@/lib/db/demoData';
 
 // ─── ID generation ─────────────────────────────────────────────────────────
@@ -81,16 +82,101 @@ class DataService {
     if (!provider) return;
 
     try {
-      const remoteItems = await provider.pullItems();
-      // Merge remote → local (remote wins for newer records)
+      const [remoteItems, remoteRelations] = await Promise.all([
+        provider.pullItems(),
+        provider.pullRelations().catch(() => [] as ItemRelation[]),
+      ]);
+
+      const pendingOps = await getAllSyncOps();
+      const dirtyItemIds = new Set(
+        pendingOps
+          .filter(op => op.entityType === 'item' && (op.status === 'pending' || op.status === 'failed' || op.status === 'needs_attention'))
+          .map(op => op.entityId)
+      );
+
       for (const remoteItem of remoteItems) {
         const localItem = await getItemById(remoteItem.id);
-        if (!localItem || remoteItem.updatedAt > localItem.updatedAt) {
+
+        if (!localItem) {
+          // New remote item
           await saveItem(remoteItem);
+          continue;
         }
+
+        const isLocalDirty = dirtyItemIds.has(localItem.id);
+
+        if (!isLocalDirty) {
+          // Clean local item: remote wins if newer or higher version
+          const remoteTime = new Date(remoteItem.updatedAt).getTime();
+          const localTime = new Date(localItem.updatedAt).getTime();
+          const remoteVer = remoteItem.version ?? 1;
+          const localVer = localItem.version ?? 1;
+
+          if (remoteTime > localTime || remoteVer > localVer) {
+            await saveItem(remoteItem);
+          }
+          continue;
+        }
+
+        // Local item IS dirty (has un-synced edits)
+        const remoteTime = new Date(remoteItem.updatedAt).getTime();
+        const localTime = new Date(localItem.updatedAt).getTime();
+
+        if (remoteTime <= localTime && (remoteItem.version ?? 1) <= (localItem.version ?? 1)) {
+          // Local was modified after or same as remote: keep local pending changes intact
+          continue;
+        }
+
+        // True conflict: remote has newer edits while local also has unpushed edits!
+        // Deterministic resolution: log conflict snapshot so zero data is lost, merge non-destructively
+        await observabilityService.logEvent({
+          category: 'conflict_detected',
+          message: `Conflict on item "${localItem.title}" (${localItem.id}). Remote updated at ${remoteItem.updatedAt}, local modified at ${localItem.updatedAt}. Local edits preserved in recovery snapshot.`,
+          entityType: 'item',
+          entityId: localItem.id,
+          details: {
+            localVersion: localItem.version,
+            remoteVersion: remoteItem.version,
+            localUpdatedAt: localItem.updatedAt,
+            remoteUpdatedAt: remoteItem.updatedAt,
+            localSnapshot: {
+              title: localItem.title,
+              content: localItem.content,
+              tags: localItem.tags,
+              metadata: localItem.metadata,
+            },
+          },
+        });
+
+        const localBackup = {
+          title: localItem.title,
+          content: localItem.content ?? '',
+          tags: localItem.tags,
+          updatedAt: localItem.updatedAt,
+          savedAt: new Date().toISOString(),
+        };
+
+        const resolvedItem: Item = {
+          ...remoteItem,
+          version: Math.max(remoteItem.version ?? 1, localItem.version ?? 1) + 1,
+          metadata: {
+            ...(remoteItem.metadata ?? {}),
+            _conflictRecovery: localBackup,
+          },
+        };
+
+        await saveItem(resolvedItem);
       }
-    } catch {
-      // Handled via syncQueue retry/status
+
+      // Merge relations with deduplication
+      for (const remoteRel of remoteRelations) {
+        await saveRelation(remoteRel);
+      }
+    } catch (err) {
+      await observabilityService.logEvent({
+        category: 'storage_failure',
+        message: `pullFromSupabase failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }
 
@@ -184,6 +270,7 @@ class DataService {
       id: partial.id ?? genId(),
       tags: partial.tags ?? [],
       archived: false,
+      version: partial.version ?? 1,
       createdAt: now,
       updatedAt: now,
     };
@@ -211,6 +298,7 @@ class DataService {
       ...existing,
       ...updates,
       id,
+      version: updates.version ?? ((existing.version ?? 1) + 1),
       createdAt: existing.createdAt,
       updatedAt: new Date().toISOString(),
     };
@@ -229,11 +317,13 @@ class DataService {
 
   async archiveItem(id: string): Promise<void> {
     await localArchiveItem(id);
-    // Send the full item, not a partial fragment — the sync payload is upserted
-    // wholesale to Supabase, so a `{ archived: true }` fragment would overwrite
-    // the remote row with blank/undefined fields.
+    // Send the full item with incremented version
     const item = await getItemById(id);
-    if (item) await syncQueueService.enqueue('item', id, 'upsert', item);
+    if (item) {
+      const updated: Item = { ...item, version: (item.version ?? 1) + 1, updatedAt: new Date().toISOString() };
+      await saveItem(updated);
+      await syncQueueService.enqueue('item', id, 'archive', updated);
+    }
   }
 
   async deleteItem(id: string): Promise<void> {

@@ -20,4 +20,7 @@ export interface RemoteStorageProvider {
 
   /** Full pull of the current user's non-archived items, newest first. */
   pullItems(): Promise<Item[]>;
+
+  /** Full pull of the current user's item relations. */
+  pullRelations(): Promise<ItemRelation[]>;
 }

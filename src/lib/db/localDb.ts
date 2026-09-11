@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Item, ItemRelation, ActivityEvent, SyncOperation } from '@/types';
+import { Item, ItemRelation, ActivityEvent, SyncOperation, DiagnosticEvent } from '@/types';
 
 // ─── DB Schema ─────────────────────────────────────────────────────────────
 
@@ -42,12 +42,20 @@ interface TrackrDB extends DBSchema {
       'by-createdAt': string;
     };
   };
+  diagnostic_events: {
+    key: string;
+    value: DiagnosticEvent;
+    indexes: {
+      'by-timestamp': string;
+      'by-category': string;
+    };
+  };
 }
 
 // ─── DB Instance ───────────────────────────────────────────────────────────
 
 const DB_NAME = 'trackr-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise: Promise<IDBPDatabase<TrackrDB>> | null = null;
 
@@ -88,6 +96,13 @@ export function getDb(): Promise<IDBPDatabase<TrackrDB>> {
           const queueStore = db.createObjectStore('sync_queue', { keyPath: 'id' });
           queueStore.createIndex('by-status', 'status');
           queueStore.createIndex('by-createdAt', 'createdAt');
+        }
+
+        // Diagnostic events store
+        if (!db.objectStoreNames.contains('diagnostic_events')) {
+          const diagStore = db.createObjectStore('diagnostic_events', { keyPath: 'id' });
+          diagStore.createIndex('by-timestamp', 'timestamp');
+          diagStore.createIndex('by-category', 'category');
         }
       },
     });
@@ -201,12 +216,11 @@ export async function deleteRelationsForItem(itemId: string): Promise<void> {
 
 export async function clearAllData(): Promise<void> {
   const db = await getDb();
-  await Promise.all([
-    db.clear('items'),
-    db.clear('item_relations'),
-    db.clear('activity_events'),
-    db.clear('sync_queue'),
-  ]);
+  const storesToClear = ['items', 'item_relations', 'activity_events', 'sync_queue'];
+  if (db.objectStoreNames.contains('diagnostic_events')) {
+    storesToClear.push('diagnostic_events');
+  }
+  await Promise.all(storesToClear.map(s => db.clear(s as 'items')));
 }
 
 // ─── Sync Queue Helpers ───────────────────────────────────────────────────
@@ -325,4 +339,31 @@ export async function isSeeded(): Promise<boolean> {
 
 export async function markSeeded(): Promise<void> {
   await setSetting('seeded', true);
+}
+
+// ─── Diagnostic Events (Observability) ─────────────────────────────────────
+
+export async function saveDiagnosticEvent(event: DiagnosticEvent): Promise<void> {
+  const db = await getDb();
+  if (!db.objectStoreNames.contains('diagnostic_events')) return;
+  await db.put('diagnostic_events', event);
+}
+
+export async function getRecentDiagnosticEvents(limit = 50): Promise<DiagnosticEvent[]> {
+  const db = await getDb();
+  if (!db.objectStoreNames.contains('diagnostic_events')) return [];
+  const all = await db.getAllFromIndex('diagnostic_events', 'by-timestamp');
+  return all.reverse().slice(0, limit);
+}
+
+export async function getAllDiagnosticEvents(): Promise<DiagnosticEvent[]> {
+  const db = await getDb();
+  if (!db.objectStoreNames.contains('diagnostic_events')) return [];
+  return db.getAll('diagnostic_events');
+}
+
+export async function clearDiagnosticEvents(): Promise<void> {
+  const db = await getDb();
+  if (!db.objectStoreNames.contains('diagnostic_events')) return;
+  await db.clear('diagnostic_events');
 }

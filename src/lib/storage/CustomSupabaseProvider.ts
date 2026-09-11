@@ -12,6 +12,7 @@ function toRow(item: Item): Record<string, unknown> {
     tags: item.tags ?? [],
     pinned: item.pinned ?? false,
     archived: item.archived ?? false,
+    version: item.version ?? 1,
     created_at: item.createdAt,
     updated_at: item.updatedAt,
   };
@@ -27,6 +28,7 @@ function fromRow(row: Record<string, unknown>): Item {
     tags: (row.tags as string[]) ?? [],
     pinned: (row.pinned as boolean) ?? false,
     archived: (row.archived as boolean) ?? false,
+    version: typeof row.version === 'number' ? row.version : 1,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -39,6 +41,16 @@ function toRelationRow(relation: ItemRelation): Record<string, unknown> {
     target_id: relation.targetId,
     relation_type: relation.relationType,
     created_at: relation.createdAt,
+  };
+}
+
+function fromRelationRow(row: Record<string, unknown>): ItemRelation {
+  return {
+    id: row.id as string,
+    sourceId: row.source_id as string,
+    targetId: row.target_id as string,
+    relationType: (row.relation_type as ItemRelation['relationType']) ?? 'linked',
+    createdAt: row.created_at as string,
   };
 }
 
@@ -105,5 +117,15 @@ export class CustomSupabaseProvider implements RemoteStorageProvider {
       .order('updated_at', { ascending: false });
     if (error || !data) return [];
     return (data as Record<string, unknown>[]).map(fromRow);
+  }
+
+  async pullRelations(): Promise<ItemRelation[]> {
+    const sb = this.client();
+    const { data, error } = await sb
+      .from('item_relations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return (data as Record<string, unknown>[]).map(fromRelationRow);
   }
 }
