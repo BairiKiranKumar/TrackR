@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, CheckCircle2, CircleAlert, ChevronDown, Flame, LogOut, Menu, RefreshCw, Settings, Wifi, WifiOff } from 'lucide-react';
+import { Bell, CheckCircle2, CircleAlert, ChevronDown, Search, LogOut, Menu, RefreshCw, Settings, Wifi, WifiOff } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { dataService } from '@/lib/services/DataService';
@@ -17,7 +17,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, userConfig, signOut, isConfigured } = useAuth();
-  const { dailyStreak, items, toggleMobileNav } = useAppContext();
+  const { items, toggleMobileNav } = useAppContext();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncDot>('idle');
@@ -77,17 +77,8 @@ export function AppHeader() {
       description: `${progress.categoryName || progress.budget.name} has reached ${Math.round(progress.percentage)}% this month.`,
       href: '/money',
     }));
-    const milestone = dailyStreak && dailyStreak.milestoneReachedOn === dailyStreak.lastOpenedDate && dailyStreak.milestoneReached
-      ? [{
-          id: `streak-${dailyStreak.lastOpenedDate}-${dailyStreak.milestoneReached}`,
-          kind: 'streak_milestone' as const,
-          title: `${dailyStreak.milestoneReached}-day app streak`,
-          description: 'A new streak milestone—keep the momentum going!',
-          href: '/',
-        }]
-      : [];
-    return [...overdueTasks, ...milestone, ...budgetNotifications];
-  }, [budgetAlerts, dailyStreak, items]);
+    return [...overdueTasks, ...budgetNotifications];
+  }, [budgetAlerts, items]);
 
   const hidden = HIDE_HEADER_ROUTES.some(route => pathname.startsWith(route));
   if (hidden || !user) return null;
@@ -140,12 +131,18 @@ export function AppHeader() {
       </div>
 
       <div className={styles.rightActions} ref={menuRef}>
-        {dailyStreak && (
-          <div className={styles.streakBadge} aria-label={`${dailyStreak.currentStreak}-day app streak`}>
-            <Flame size={13} aria-hidden="true" />
-            <span>{dailyStreak.currentStreak}</span>
-          </div>
-        )}
+        <button
+          className={styles.searchTrigger}
+          onClick={() => {
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
+          }}
+          id="btn-header-search"
+          aria-label="Open Command Palette (Cmd + K)"
+        >
+          <Search size={14} />
+          <span className={styles.searchTriggerText}>Search or jump to...</span>
+          <kbd className={styles.kbd}>⌘K</kbd>
+        </button>
 
         <div className={styles.notificationsWrap}>
           <button
@@ -167,7 +164,7 @@ export function AppHeader() {
                 <div className={styles.notificationsList}>
                   {notifications.map(notification => (
                     <button key={notification.id} className={styles.notificationItem} onClick={() => { setNotificationsOpen(false); if (notification.href) router.push(notification.href); }}>
-                      {notification.kind === 'streak_milestone' ? <Flame size={17} className={styles.milestoneIcon} /> : <CircleAlert size={17} className={styles.alertIcon} />}
+                      <CircleAlert size={17} className={styles.alertIcon} />
                       <span><strong>{notification.title}</strong><small>{notification.description}</small></span>
                     </button>
                   ))}

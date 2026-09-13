@@ -13,12 +13,23 @@ import {
   Plus,
   History,
   Zap,
+  Target,
+  TrendingUp,
 } from 'lucide-react';
-import { Item, TaskMetadata } from '@/types';
+import { Item, TaskMetadata, GoalMetadata, TrackerMetadata, ProjectStatus } from '@/types';
 import { contextGraphService } from '@/lib/services/ContextGraphService';
 import { dataService } from '@/lib/services/DataService';
 import { ContextPanel } from '@/components/context/ContextPanel';
+import { Badge, Button } from '@/components/ui';
 import styles from './page.module.css';
+
+const STATUS_VARIANTS: Record<ProjectStatus, 'primary' | 'warning' | 'success' | 'default'> = {
+  active: 'primary',
+  on_hold: 'warning',
+  completed: 'success',
+  paused: 'default',
+  archived: 'default',
+};
 
 export default function ProjectCockpitPage() {
   const params = useParams();
@@ -106,8 +117,8 @@ export default function ProjectCockpitPage() {
   if (loading) {
     return (
       <div className={styles.container}>
-        <div className={styles.emptySection} style={{ padding: 60 }}>
-          <p>Loading project cockpit…</p>
+        <div className={styles.emptySection} style={{ padding: 48 }}>
+          <p>Loading project command center…</p>
         </div>
       </div>
     );
@@ -115,66 +126,93 @@ export default function ProjectCockpitPage() {
 
   if (!cockpit) return null;
 
-  const { project, metadata, nextActions, tasks, notes, transactions, finSummary, linkedBudgetProgress, activity } = cockpit;
+  const {
+    project,
+    metadata,
+    nextActions,
+    tasks,
+    notes,
+    goals,
+    trackers,
+    transactions,
+    finSummary,
+    linkedBudgetProgress,
+    activity,
+  } = cockpit;
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => (t.metadata as TaskMetadata)?.status === 'done').length;
   const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const projectStatus: ProjectStatus = (metadata.status as ProjectStatus) || 'active';
+  const statusVariant = STATUS_VARIANTS[projectStatus] || 'primary';
 
   const hasFinancialRecords = transactions.length > 0 || finSummary.totalExpenses > 0 || finSummary.totalIncome > 0;
 
   return (
     <div className={styles.container} id="project-cockpit">
-      {/* Back Link */}
-      <Link href="/projects" className={styles.backLink}>
-        <ArrowLeft size={16} />
-        <span>Back to Projects</span>
-      </Link>
+      {/* Navigation breadcrumb */}
+      <div className={styles.topNav}>
+        <Link href="/projects" className={styles.backLink}>
+          <ArrowLeft size={14} />
+          <span>Projects</span>
+        </Link>
+      </div>
 
-      {/* Header Card */}
+      {/* Header Command Card */}
       <div className={styles.headerCard}>
         <div className={styles.headerTop}>
           <div className={styles.titleArea}>
-            <div className={styles.projectEmoji}>{metadata.emoji || '📁'}</div>
-            <div>
-              <h1 className={styles.projectTitle}>{project.title}</h1>
-              <div className={styles.headerMeta}>
-                <span className={styles.statusBadge}>{metadata.status || 'Active'}</span>
-                {metadata.targetDate && (
-                  <span className={styles.targetDate}>
-                    <Calendar size={13} />
-                    <span>Target: {metadata.targetDate}</span>
-                  </span>
-                )}
-              </div>
+            <h1 className={styles.projectTitle}>{project.title}</h1>
+            <div className={styles.headerMeta}>
+              <Badge variant={statusVariant} size="sm">
+                {projectStatus.replace('_', ' ')}
+              </Badge>
+              {metadata.targetDate && (
+                <span className={styles.targetDate}>
+                  <Calendar size={12} />
+                  <span>Target: {metadata.targetDate}</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.headerProgressCol}>
+            <div className={styles.progressPercentRow}>
+              <span className={styles.progressPercent}>{progressPct}%</span>
+              <span className={styles.progressMeta}>
+                {completedTasks} of {totalTasks} tasks
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className={styles.progressContainer}>
-          <div className={styles.progressLabelRow}>
-            <span>Project Completion</span>
-            <span>{completedTasks} of {totalTasks} tasks ({progressPct}%)</span>
-          </div>
-          <div className={styles.progressBarBg}>
-            <div className={styles.progressBarFill} style={{ width: `${progressPct}%` }} />
-          </div>
+        {project.content && (
+          <p className={styles.projectDescription}>{project.content}</p>
+        )}
+
+        {/* Hairline Progress Bar */}
+        <div className={styles.progressBarBg}>
+          <div
+            className={styles.progressBarFill}
+            style={{ width: `${progressPct}%` }}
+          />
         </div>
       </div>
 
-      {/* Two Column Layout */}
+      {/* Two Column Command Center Layout */}
       <div className={styles.grid}>
         {/* Main Column */}
         <div className={styles.mainCol}>
           {/* 1. NEXT ACTIONS (Unblocked actionable tasks only) */}
           <div className={styles.sectionCard} id="section-next-actions">
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>
-                <Zap size={16} color="var(--accent-purple, #8b5cf6)" />
-                <span>Next Actions</span>
-              </h2>
-              <span className={styles.sectionBadge}>{nextActions.length}</span>
+              <div className={styles.sectionTitleGroup}>
+                <Zap size={15} className={styles.actionIcon} />
+                <h2 className={styles.sectionTitle}>Next Actions</h2>
+              </div>
+              <Badge variant="primary" size="sm">
+                {nextActions.length}
+              </Badge>
             </div>
 
             {nextActions.length === 0 ? (
@@ -182,21 +220,19 @@ export default function ProjectCockpitPage() {
                 <p>No actionable unblocked tasks right now.</p>
               </div>
             ) : (
-              <div className={styles.taskList}>
+              <div className={styles.rowList}>
                 {nextActions.map(task => (
-                  <div key={task.id} className={styles.taskItem}>
-                    <div className={styles.taskItemLeft}>
-                      <button
-                        className={styles.checkBtn}
-                        onClick={() => handleToggleTask(task)}
-                        aria-label="Complete task"
-                      >
-                        <Circle size={17} />
-                      </button>
-                      <Link href={`/track/${task.id}`} className={styles.taskTitle}>
-                        {task.title}
-                      </Link>
-                    </div>
+                  <div key={task.id} className={styles.structuredRow}>
+                    <button
+                      className={styles.checkBtn}
+                      onClick={() => handleToggleTask(task)}
+                      aria-label="Complete task"
+                    >
+                      <Circle size={16} />
+                    </button>
+                    <Link href={`/track/${task.id}`} className={styles.rowTitle}>
+                      {task.title}
+                    </Link>
                   </div>
                 ))}
               </div>
@@ -206,33 +242,34 @@ export default function ProjectCockpitPage() {
           {/* 2. TASKS */}
           <div className={styles.sectionCard} id="section-tasks">
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>
-                <CheckCircle2 size={16} color="var(--accent-blue, #38bdf8)" />
-                <span>All Tasks</span>
-              </h2>
-              <span className={styles.sectionBadge}>{tasks.length}</span>
+              <div className={styles.sectionTitleGroup}>
+                <CheckCircle2 size={15} className={styles.taskIcon} />
+                <h2 className={styles.sectionTitle}>All Tasks</h2>
+              </div>
+              <Badge variant="default" size="sm">
+                {tasks.length}
+              </Badge>
             </div>
 
             {/* Quick Add Task */}
-            <form onSubmit={handleQuickAddTask} style={{ display: 'flex', gap: 8 }}>
+            <form onSubmit={handleQuickAddTask} className={styles.quickAddForm}>
               <input
                 id="input-quick-add-project-task"
                 type="text"
                 placeholder="Add a task to this project…"
                 value={newTaskTitle}
                 onChange={e => setNewTaskTitle(e.target.value)}
-                className="input-text"
-                style={{ flex: 1, padding: '8px 12px', fontSize: '0.88rem' }}
+                className={styles.quickAddInput}
               />
-              <button
+              <Button
                 type="submit"
-                className="btn btn-primary"
+                variant="primary"
+                size="sm"
                 disabled={!newTaskTitle.trim() || creatingTask}
-                style={{ padding: '8px 14px' }}
               >
-                <Plus size={14} />
+                <Plus size={13} />
                 <span>Add</span>
-              </button>
+              </Button>
             </form>
 
             {tasks.length === 0 ? (
@@ -240,31 +277,29 @@ export default function ProjectCockpitPage() {
                 <p>No tasks yet in this project.</p>
               </div>
             ) : (
-              <div className={styles.taskList}>
+              <div className={styles.rowList}>
                 {tasks.map(task => {
                   const isDone = (task.metadata as TaskMetadata)?.status === 'done';
                   return (
-                    <div key={task.id} className={styles.taskItem}>
-                      <div className={styles.taskItemLeft}>
-                        <button
-                          className={styles.checkBtn}
-                          onClick={() => handleToggleTask(task)}
-                          aria-label={isDone ? 'Mark active' : 'Complete task'}
-                        >
-                          {isDone ? (
-                            <CheckCircle2 size={17} color="var(--color-success, #10b981)" />
-                          ) : (
-                            <Circle size={17} />
-                          )}
-                        </button>
-                        <Link
-                          href={`/track/${task.id}`}
-                          className={`${styles.taskTitle} ${isDone ? styles.taskDone : ''}`}
-                        >
-                          {task.title}
-                        </Link>
-                      </div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                    <div key={task.id} className={styles.structuredRow}>
+                      <button
+                        className={styles.checkBtn}
+                        onClick={() => handleToggleTask(task)}
+                        aria-label={isDone ? 'Mark active' : 'Complete task'}
+                      >
+                        {isDone ? (
+                          <CheckCircle2 size={16} className={styles.checkedIcon} />
+                        ) : (
+                          <Circle size={16} />
+                        )}
+                      </button>
+                      <Link
+                        href={`/track/${task.id}`}
+                        className={`${styles.rowTitle} ${isDone ? styles.taskDone : ''}`}
+                      >
+                        {task.title}
+                      </Link>
+                      <span className={styles.rowMeta}>
                         {(task.metadata as TaskMetadata)?.status || 'todo'}
                       </span>
                     </div>
@@ -277,11 +312,13 @@ export default function ProjectCockpitPage() {
           {/* 3. NOTES */}
           <div className={styles.sectionCard} id="section-notes">
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>
-                <FileText size={16} color="var(--accent-emerald, #10b981)" />
-                <span>Notes & Docs</span>
-              </h2>
-              <span className={styles.sectionBadge}>{notes.length}</span>
+              <div className={styles.sectionTitleGroup}>
+                <FileText size={15} className={styles.noteIcon} />
+                <h2 className={styles.sectionTitle}>Notes & Docs</h2>
+              </div>
+              <Badge variant="default" size="sm">
+                {notes.length}
+              </Badge>
             </div>
 
             {notes.length === 0 ? (
@@ -289,27 +326,98 @@ export default function ProjectCockpitPage() {
                 <p>No notes connected to this project.</p>
               </div>
             ) : (
-              <div className={styles.taskList}>
+              <div className={styles.rowList}>
                 {notes.map(note => (
-                  <div key={note.id} className={styles.taskItem}>
-                    <Link href={`/notes/${note.id}`} className={styles.taskItemLeft}>
-                      <FileText size={16} color="var(--accent-emerald, #10b981)" />
-                      <span className={styles.taskTitle}>{note.title}</span>
-                    </Link>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Note</span>
-                  </div>
+                  <Link key={note.id} href={`/notes/${note.id}`} className={styles.structuredRowLink}>
+                    <div className={styles.rowLinkLeft}>
+                      <FileText size={14} className={styles.noteIcon} />
+                      <span className={styles.rowTitle}>{note.title}</span>
+                    </div>
+                    <span className={styles.rowMeta}>Note</span>
+                  </Link>
                 ))}
               </div>
             )}
           </div>
 
+          {/* 4. GOALS */}
+          {goals.length > 0 && (
+            <div className={styles.sectionCard} id="section-goals">
+              <div className={styles.sectionHeader}>
+                <div className={styles.sectionTitleGroup}>
+                  <Target size={15} className={styles.goalIcon} />
+                  <h2 className={styles.sectionTitle}>Connected Goals</h2>
+                </div>
+                <Badge variant="default" size="sm">
+                  {goals.length}
+                </Badge>
+              </div>
+
+              <div className={styles.rowList}>
+                {goals.map(goal => {
+                  const gMeta = (goal.metadata || {}) as GoalMetadata;
+                  const current = gMeta.currentAmount || 0;
+                  const target = gMeta.targetAmount || 100;
+                  const pct = Math.min(100, Math.round((current / target) * 100));
+
+                  return (
+                    <div key={goal.id} className={styles.structuredRow}>
+                      <div className={styles.goalRowLeft}>
+                        <Target size={14} className={styles.goalIcon} />
+                        <span className={styles.rowTitle}>{goal.title}</span>
+                      </div>
+                      <div className={styles.goalRowRight}>
+                        <span className={styles.monoNumber}>
+                          {gMeta.isFinancial ? `₹${current.toLocaleString()} / ₹${target.toLocaleString()}` : `${current} / ${target}`}
+                        </span>
+                        <span className={styles.progressPercent}>{pct}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 5. TRACKERS */}
+          {trackers.length > 0 && (
+            <div className={styles.sectionCard} id="section-trackers">
+              <div className={styles.sectionHeader}>
+                <div className={styles.sectionTitleGroup}>
+                  <TrendingUp size={15} className={styles.trackerIcon} />
+                  <h2 className={styles.sectionTitle}>Active Trackers</h2>
+                </div>
+                <Badge variant="default" size="sm">
+                  {trackers.length}
+                </Badge>
+              </div>
+
+              <div className={styles.rowList}>
+                {trackers.map(tr => {
+                  const tMeta = (tr.metadata || {}) as TrackerMetadata;
+                  return (
+                    <div key={tr.id} className={styles.structuredRow}>
+                      <div className={styles.rowLinkLeft}>
+                        <TrendingUp size={14} className={styles.trackerIcon} />
+                        <span className={styles.rowTitle}>{tr.title}</span>
+                      </div>
+                      <span className={styles.rowMeta}>
+                        {tMeta.targetValue ? `Target: ${tMeta.targetValue} ${tMeta.unit || ''}` : 'Tracking'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 6. MONEY SECTION */}
           <div className={styles.sectionCard} id="section-money">
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>
-                <DollarSign size={16} color="var(--color-success, #10b981)" />
-                <span>Project Financials</span>
-              </h2>
+              <div className={styles.sectionTitleGroup}>
+                <DollarSign size={15} className={styles.moneyIcon} />
+                <h2 className={styles.sectionTitle}>Project Financials</h2>
+              </div>
             </div>
 
             {!hasFinancialRecords ? (
@@ -317,25 +425,25 @@ export default function ProjectCockpitPage() {
                 <p>No project expenses yet</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className={styles.moneyContent}>
                 {/* Metrics */}
                 <div className={styles.moneyGrid}>
                   <div className={styles.moneyMetric}>
                     <span className={styles.moneyLabel}>Total Spent</span>
-                    <span className={styles.moneyValue} style={{ color: 'var(--color-danger, #ef4444)' }}>
-                      ₹{finSummary.totalExpenses.toLocaleString()}
+                    <span className={`${styles.moneyValue} ${styles.moneyDanger}`}>
+                      ₹{finSummary.totalExpenses.toLocaleString('en-IN')}
                     </span>
                   </div>
                   <div className={styles.moneyMetric}>
                     <span className={styles.moneyLabel}>Total Income</span>
-                    <span className={styles.moneyValue} style={{ color: 'var(--color-success, #10b981)' }}>
-                      ₹{finSummary.totalIncome.toLocaleString()}
+                    <span className={`${styles.moneyValue} ${styles.moneySuccess}`}>
+                      ₹{finSummary.totalIncome.toLocaleString('en-IN')}
                     </span>
                   </div>
                   <div className={styles.moneyMetric}>
                     <span className={styles.moneyLabel}>Net Position</span>
                     <span className={styles.moneyValue}>
-                      {finSummary.net >= 0 ? '+' : ''}₹{finSummary.net.toLocaleString()}
+                      {finSummary.net >= 0 ? '+' : ''}₹{finSummary.net.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>
@@ -343,10 +451,10 @@ export default function ProjectCockpitPage() {
                 {/* Linked Budget Progress */}
                 {linkedBudgetProgress && (
                   <div className={styles.budgetBox}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                      <span style={{ fontWeight: 700 }}>{linkedBudgetProgress.budget.name}</span>
-                      <span>
-                        ₹{linkedBudgetProgress.spent.toLocaleString()} / ₹{linkedBudgetProgress.budget.target.toLocaleString()} ({Math.round(linkedBudgetProgress.percentage)}%)
+                    <div className={styles.budgetHeader}>
+                      <span className={styles.budgetName}>{linkedBudgetProgress.budget.name}</span>
+                      <span className={styles.monoNumber}>
+                        ₹{linkedBudgetProgress.spent.toLocaleString('en-IN')} / ₹{linkedBudgetProgress.budget.target.toLocaleString('en-IN')} ({Math.round(linkedBudgetProgress.percentage)}%)
                       </span>
                     </div>
                     <div className={styles.progressBarBg}>
@@ -355,38 +463,38 @@ export default function ProjectCockpitPage() {
                         style={{
                           width: `${Math.min(100, linkedBudgetProgress.percentage)}%`,
                           background: linkedBudgetProgress.isOver
-                            ? 'var(--color-danger, #ef4444)'
+                            ? 'var(--color-danger)'
                             : linkedBudgetProgress.isAlert
-                            ? 'var(--color-warning, #f59e0b)'
-                            : 'var(--accent-purple, #8b5cf6)',
+                            ? 'var(--color-warning)'
+                            : 'var(--accent-primary)',
                         }}
                       />
                     </div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-                      ₹{linkedBudgetProgress.remaining.toLocaleString()} remaining in budget
+                    <span className={styles.budgetRemaining}>
+                      ₹{linkedBudgetProgress.remaining.toLocaleString('en-IN')} remaining in budget
                     </span>
                   </div>
                 )}
 
                 {/* Linked Transactions List */}
-                <div className={styles.taskList}>
+                <div className={styles.rowList}>
                   {transactions.map(txn => {
                     const isExp = txn.type === 'expense';
                     return (
-                      <div key={txn.id} className={styles.taskItem}>
-                        <div className={styles.taskItemLeft}>
-                          <DollarSign size={15} color={isExp ? 'var(--color-danger)' : 'var(--color-success)'} />
-                          <span className={styles.taskTitle}>{txn.payee || txn.note || 'Transaction'}</span>
+                      <div key={txn.id} className={styles.structuredRow}>
+                        <div className={styles.rowLinkLeft}>
+                          <DollarSign
+                            size={14}
+                            className={isExp ? styles.expenseIcon : styles.incomeIcon}
+                          />
+                          <span className={styles.rowTitle}>
+                            {txn.payee || txn.note || 'Transaction'}
+                          </span>
                         </div>
                         <span
-                          style={{
-                            fontFamily: 'var(--font-mono, monospace)',
-                            fontWeight: 700,
-                            fontSize: '0.88rem',
-                            color: isExp ? 'var(--color-danger)' : 'var(--color-success)',
-                          }}
+                          className={`${styles.monoNumber} ${isExp ? styles.expenseAmount : styles.incomeAmount}`}
                         >
-                          {isExp ? '-' : '+'}₹{txn.amount.toLocaleString()}
+                          {isExp ? '-' : '+'}₹{txn.amount.toLocaleString('en-IN')}
                         </span>
                       </div>
                     );
@@ -399,21 +507,23 @@ export default function ProjectCockpitPage() {
 
         {/* Side Column */}
         <div className={styles.sideCol}>
-          {/* 4 & 5. Universal Context Panel */}
-          <ContextPanel
-            entityId={projectId}
-            entityType="project"
-            entityTitle={project.title}
-            onLinkChanged={loadCockpit}
-          />
+          {/* Related / Context Panel */}
+          <div className={styles.sideSection} id="section-related">
+            <ContextPanel
+              entityId={projectId}
+              entityType="project"
+              entityTitle={project.title}
+              onLinkChanged={loadCockpit}
+            />
+          </div>
 
-          {/* 8. Recent Activity */}
+          {/* Activity Timeline */}
           <div className={styles.sectionCard} id="section-activity">
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>
-                <History size={15} color="var(--text-tertiary)" />
-                <span>Recent Activity</span>
-              </h2>
+              <div className={styles.sectionTitleGroup}>
+                <History size={14} className={styles.activityIcon} />
+                <h2 className={styles.sectionTitle}>Recent Activity</h2>
+              </div>
             </div>
 
             {activity.length === 0 ? (
@@ -425,9 +535,11 @@ export default function ProjectCockpitPage() {
                 {activity.slice(0, 8).map(event => (
                   <div key={event.id} className={styles.timelineItem}>
                     <div className={styles.timelineDot} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span>{event.description || event.type.replace('_', ' ')}</span>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                    <div className={styles.timelineBody}>
+                      <span className={styles.timelineText}>
+                        {event.description || event.type.replace('_', ' ')}
+                      </span>
+                      <span className={styles.timelineDate}>
                         {new Date(event.createdAt).toLocaleDateString()}
                       </span>
                     </div>

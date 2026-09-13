@@ -1,0 +1,71 @@
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  background: transparent;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.iconButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Sizes */
+.sm {
+  width: 28px;
+  height: 28px;
+}
+
+.md {
+  width: 34px;
+  height: 34px;
+}
+
+.lg {
+  width: 40px;
+  height: 40px;
+}
+
+/* Variants */
+.ghost:hover:not(:disabled) {
+  background-color: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.secondary {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.secondary:hover:not(:disabled) {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-strong);
+}
+
+.primary {
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+.primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.danger:hover:not(:disabled) {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+}

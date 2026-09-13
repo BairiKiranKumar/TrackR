@@ -1,117 +1,122 @@
 .card {
-  background: var(--bg-card, #131317);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
-  border-radius: 16px;
-  padding: 18px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  gap: var(--space-2);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .card:hover {
-  background: var(--bg-card-hover, #1a1a21);
-  border-color: var(--border-strong, rgba(255, 255, 255, 0.18));
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-base);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: var(--space-2);
 }
 
 .titleGroup {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .name {
-  font-size: 1.05rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #f4f4f6);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.subtitle {
-  font-size: 0.8rem;
-  color: var(--text-tertiary, #636375);
+.categoryMeta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
-.badge {
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.periodNote {
+  color: var(--accent-primary);
+  font-style: italic;
 }
 
-.badgeNormal {
-  background: var(--bg-elevated, #202028);
-  color: var(--text-secondary, #9e9ead);
-}
-
-.badgeAlert {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--color-warning, #f59e0b);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-.badgeOver {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger, #ef4444);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.progressContainer {
+.remainingRow {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
+.remainingValue {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.remainingOver {
+  color: var(--color-danger);
+}
+
+.daysMeta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Hairline bar */
 .barTrack {
-  height: 8px;
-  background: var(--bg-secondary, #111114);
+  height: 3px;
+  background: var(--border-subtle);
   border-radius: 9999px;
   overflow: hidden;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
 }
 
 .barFill {
   height: 100%;
   border-radius: 9999px;
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width var(--transition-normal);
 }
 
 .fillNormal {
-  background: linear-gradient(90deg, #6366f1, #818cf8);
+  background: var(--accent-primary);
 }
 
 .fillAlert {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  background: var(--color-warning);
 }
 
 .fillOver {
-  background: linear-gradient(90deg, #ef4444, #f87171);
+  background: var(--color-danger);
 }
 
 .statsRow {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--text-secondary, #9e9ead);
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
-.statValue {
-  font-weight: 700;
-  color: var(--text-primary, #f4f4f6);
+.spentInfo {
+  color: var(--text-secondary);
 }
 
-.footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.78rem;
-  color: var(--text-tertiary, #636375);
-  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
-  padding-top: 10px;
+.monoNumber {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pctInfo {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }

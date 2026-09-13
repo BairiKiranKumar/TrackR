@@ -263,52 +263,59 @@ function HomeDashboard() {
         )}
       </section>
 
-      {/* 2. CURRENT CONTEXT (Active Projects with Context Badges) */}
+      {/* 2. ACTIVE PROJECTS */}
       {activeProjects.length > 0 && (
         <section className={styles.section}>
           <div className="section-header">
-            <span className="section-title">Current Context</span>
+            <span className="section-title">Active Projects</span>
             <Link href="/projects" className={styles.seeAll} id="link-home-projects-all">
               See all <ChevronRight size={14} />
             </Link>
           </div>
-          <div className={styles.projectsRow}>
+          <div className={styles.projectRowsList}>
             {activeProjects.map(proj => {
               const ctx = projectContexts[proj.id];
               const meta = (proj.metadata || {}) as ProjectMetadata;
-              const color = meta.color || 'var(--accent-primary)';
-              const openTasks = ctx?.openTasksCount ?? 0;
-              const notesCount = ctx?.notes?.length ?? 0;
+              const totalTasks = (ctx?.openTasksCount ?? 0) + (ctx?.completedTasksCount ?? 0);
+              const progressPct = totalTasks > 0 ? Math.round(((ctx?.completedTasksCount ?? 0) / totalTasks) * 100) : 0;
+              const nextAction = ctx?.tasks?.find(t => (t.metadata as TaskMetadata)?.status !== 'done');
               const expensesTotal = ctx?.totalExpenses ?? 0;
 
               return (
                 <Link
                   key={proj.id}
                   href={`/projects/${proj.id}`}
-                  className={styles.projectSpotlightCard}
-                  style={{ borderLeftColor: color }}
+                  className={styles.projectRowItem}
+                  id={`link-project-${proj.id}`}
                 >
-                  <div className={styles.projSpotlightTop}>
-                    <span className={styles.projSpotlightTitle}>{proj.title}</span>
+                  <div className={styles.projRowMain}>
+                    <div className={styles.projRowTitleLine}>
+                      <span className={styles.projRowTitle}>{proj.title}</span>
+                      <span className={styles.projRowStatus}>{meta.status || 'active'}</span>
+                    </div>
+                    {nextAction ? (
+                      <span className={styles.projRowNextAction}>
+                        Next: {nextAction.title}
+                      </span>
+                    ) : proj.content ? (
+                      <span className={styles.projRowNextAction}>{proj.content}</span>
+                    ) : null}
                   </div>
-                  {proj.content && (
-                    <p className={styles.projSpotlightDesc}>{proj.content}</p>
-                  )}
-                  <div className={styles.projBadgesRow}>
-                    <span className={styles.projBadge}>
-                      <CheckCircle2 size={11} />
-                      {openTasks} task{openTasks !== 1 ? 's' : ''}
-                    </span>
-                    <span className={styles.projBadge}>
-                      <FileText size={11} />
-                      {notesCount} note{notesCount !== 1 ? 's' : ''}
+                  <div className={styles.projRowMeta}>
+                    <span className={styles.projRowPill}>
+                      {ctx?.openTasksCount ?? 0} task{(ctx?.openTasksCount ?? 0) !== 1 ? 's' : ''}
                     </span>
                     {expensesTotal > 0 && (
-                      <span className={styles.projBadge}>
-                        <DollarSign size={11} />
+                      <span className={styles.projRowSpend}>
                         ₹{expensesTotal.toLocaleString('en-IN')}
                       </span>
                     )}
+                    <div className={styles.projRowProgress}>
+                      <div className={styles.progressTrack}>
+                        <div className={styles.progressFill} style={{ width: `${progressPct}%` }} />
+                      </div>
+                      <span className={styles.progressText}>{progressPct}%</span>
+                    </div>
                   </div>
                 </Link>
               );

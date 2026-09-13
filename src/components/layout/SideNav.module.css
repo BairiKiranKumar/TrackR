@@ -202,7 +202,7 @@
 }
 
 .quickAddBtn:hover {
-  background: var(--accent-secondary);
+  background: var(--accent-hover);
 }
 
 .quickAddBtn:active {

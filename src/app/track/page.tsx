@@ -3,13 +3,14 @@
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Star, Trash2, Target, Folder, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Target, Folder, ChevronLeft, ChevronRight, Check, Activity } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
-import { Item, TrackerMetadata, TaskMetadata } from '@/types';
+import { Item, TrackerMetadata, TaskMetadata, GoalMetadata } from '@/types';
 import { dataService } from '@/lib/services/DataService';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import { TaskListView } from '@/components/tasks/TaskListView';
+import { Button, Badge, EmptyState } from '@/components/ui';
 import styles from './page.module.css';
 
 type Tab = 'tasks' | 'trackers' | 'goals' | 'projects';
@@ -57,27 +58,30 @@ function TrackContent() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Track</h1>
-        <button
-          className="btn btn-primary btn-icon btn-round"
+        <div>
+          <h1 className={styles.title}>Track</h1>
+          <p className={styles.subtitle}>Instruments, habits, goals, and active initiatives.</p>
+        </div>
+        <Button
+          variant="primary"
           onClick={() => router.push(`/track/new?type=${activeTab === 'tasks' ? 'task' : activeTab === 'trackers' ? 'tracker' : activeTab === 'goals' ? 'goal' : 'project'}`)}
           id="btn-track-new"
-          aria-label="New item"
         >
-          <Plus size={20} />
-        </button>
+          <Plus size={15} />
+          <span>New {activeTab === 'tasks' ? 'Task' : activeTab === 'trackers' ? 'Tracker' : activeTab === 'goals' ? 'Goal' : 'Project'}</span>
+        </Button>
       </div>
 
       {/* Tab bar */}
-      <div className="tab-bar">
+      <div className={styles.tabsNav}>
         {tabs.map(tab => (
           <button
             key={tab.id}
             id={`tab-track-${tab.id}`}
-            className={`tab-item ${activeTab === tab.id ? 'tab-item--active' : ''}`}
+            className={`${styles.tabBtn} ${activeTab === tab.id ? styles.tabBtnActive : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
-            {tab.label}
+            <span>{tab.label}</span>
             {tab.count > 0 && <span className={styles.tabCount}>{tab.count}</span>}
           </button>
         ))}
@@ -85,7 +89,7 @@ function TrackContent() {
 
       {/* Tasks tab */}
       {activeTab === 'tasks' && (
-        <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ marginTop: '0.5rem' }}>
           <TaskListView view="all" showTabs={true} />
         </div>
       )}
@@ -93,44 +97,91 @@ function TrackContent() {
       {/* Trackers tab */}
       {activeTab === 'trackers' && (
         <div className={styles.list}>
-          {trackers.length === 0 && (
-            <div className="empty-state">
-              <span className="empty-state__icon"><Target size={36} /></span>
-              <span className="empty-state__title">No trackers yet</span>
-              <span className="empty-state__subtitle">Create a series, streak, or habit tracker to stay consistent.</span>
-            </div>
+          {trackers.length === 0 ? (
+            <EmptyState
+              icon={<Activity size={32} />}
+              title="No trackers yet"
+              description="Create a numeric series, habit frequency, or measurement tracker."
+              action={
+                <Button
+                  variant="primary"
+                  onClick={() => router.push('/track/new?type=tracker')}
+                >
+                  <Plus size={15} />
+                  <span>Create Tracker</span>
+                </Button>
+              }
+            />
+          ) : (
+            trackers.map(tracker => (
+              <TrackerCard
+                key={tracker.id}
+                tracker={tracker}
+                onUpdate={refreshItems}
+                onDelete={(e) => handleDeleteItem(e, tracker.id, tracker.title)}
+              />
+            ))
           )}
-          {trackers.map(tracker => (
-            <TrackerCard key={tracker.id} tracker={tracker} onUpdate={refreshItems} onDelete={(e) => handleDeleteItem(e, tracker.id, tracker.title)} />
-          ))}
         </div>
       )}
 
       {/* Goals tab */}
       {activeTab === 'goals' && (
         <div className={styles.list}>
-          {goals.length === 0 && (
-            <div className="empty-state">
-              <span className="empty-state__icon"><Star size={36} /></span>
-              <span className="empty-state__title">No goals yet</span>
-              <span className="empty-state__subtitle">Set targets and track your progress toward them.</span>
-            </div>
+          {goals.length === 0 ? (
+            <EmptyState
+              icon={<Target size={32} />}
+              title="No goals yet"
+              description="Set targets and connect them to tasks, projects, or financial milestones."
+              action={
+                <Button
+                  variant="primary"
+                  onClick={() => router.push('/track/new?type=goal')}
+                >
+                  <Plus size={15} />
+                  <span>Create Goal</span>
+                </Button>
+              }
+            />
+          ) : (
+            goals.map(goal => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                onDelete={(e) => handleDeleteItem(e, goal.id, goal.title)}
+              />
+            ))
           )}
-          {goals.map(goal => <GoalCard key={goal.id} goal={goal} onDelete={(e) => handleDeleteItem(e, goal.id, goal.title)} />)}
         </div>
       )}
 
       {/* Projects tab */}
       {activeTab === 'projects' && (
         <div className={styles.list}>
-          {projects.length === 0 && (
-            <div className="empty-state">
-              <span className="empty-state__icon"><Folder size={36} /></span>
-              <span className="empty-state__title">No projects yet</span>
-              <span className="empty-state__subtitle">Projects are containers. Use @references to connect notes, tasks, and money to them.</span>
-            </div>
+          {projects.length === 0 ? (
+            <EmptyState
+              icon={<Folder size={32} />}
+              title="No projects yet"
+              description="Group tasks, notes, trackers, and finances into cohesive initiatives."
+              action={
+                <Button
+                  variant="primary"
+                  onClick={() => router.push('/projects')}
+                >
+                  <Plus size={15} />
+                  <span>Go to Projects</span>
+                </Button>
+              }
+            />
+          ) : (
+            projects.map(project => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onDelete={(e) => handleDeleteItem(e, project.id, project.title)}
+              />
+            ))
           )}
-          {projects.map(project => <ProjectCard key={project.id} project={project} onDelete={(e) => handleDeleteItem(e, project.id, project.title)} />)}
         </div>
       )}
     </div>
@@ -151,8 +202,6 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
   const streak = meta.currentStreak ?? 0;
 
   const dayPageCount = Math.max(1, Math.ceil(total / DAY_GRID_PAGE_SIZE));
-  // Open on whichever page of 15 contains the next day to complete, so a
-  // tracker that's already well underway doesn't dump you back at day 1.
   const [dayPage, setDayPage] = useState(() =>
     Math.min(Math.floor(completed / DAY_GRID_PAGE_SIZE), dayPageCount - 1)
   );
@@ -161,7 +210,7 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
 
   async function handleDayTap(dayIndex: number) {
     const completedDays = meta.completedDays ?? [];
-    if (completedDays.includes(dayIndex)) return; // already done
+    if (completedDays.includes(dayIndex)) return;
     await dataService.completeTrackerDay(tracker.id, dayIndex);
     onUpdate();
   }
@@ -174,67 +223,87 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
     onUpdate();
   }
 
+  const isDoneToday = (meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]);
+
   return (
     <div className={styles.trackerCard} id={`tracker-card-${tracker.id}`}>
-      <div className={styles.trackerHeader}>
-        <Link href={`/track/${tracker.id}`} className={styles.trackerMainLink} id={`link-tracker-${tracker.id}`}>
-          <span className={styles.trackerEmoji}>{meta.emoji ?? (isStreak ? '🔥' : '🎯')}</span>
-          <div className={styles.trackerMeta}>
-            <span className={styles.trackerName}>{tracker.title}</span>
-            <div className={styles.trackerStats}>
+      <div className={styles.cardHeader}>
+        <Link href={`/track/${tracker.id}`} className={styles.cardMainLink} id={`link-tracker-${tracker.id}`}>
+          <div className={styles.trackerTitleArea}>
+            <h3 className={styles.cardTitle}>{tracker.title}</h3>
+            <div className={styles.trackerMetaRow}>
               {streak > 0 && (
-                <span className="streak-badge">
-                  <span className="streak-fire">🔥</span> {streak} day streak
+                <span className={styles.instrumentBadge}>
+                  {streak} consecutive days
                 </span>
               )}
               {isSeries && total > 0 && (
-                <span className={styles.trackerStat}>{completed}/{total} days</span>
+                <span className={styles.instrumentValue}>
+                  {completed} / {total} days ({Math.round(pct)}%)
+                </span>
+              )}
+              {typeof meta.target === 'number' && (
+                <span className={styles.instrumentValue}>
+                  Target: {meta.target} {meta.unit || ''}
+                </span>
               )}
             </div>
           </div>
         </Link>
-        {onDelete && (
-          <button
-            type="button"
-            className="btn btn-icon btn-ghost"
-            onClick={onDelete}
-            id={`btn-delete-tracker-${tracker.id}`}
-            title="Delete tracker"
-            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
-          >
-            <Trash2 size={16} />
-          </button>
-        )}
+
+        <div className={styles.cardActions}>
+          {isStreak && (
+            <button
+              type="button"
+              className={`${styles.logBtn} ${isDoneToday ? styles.logBtnDone : ''}`}
+              onClick={handleStreakTap}
+              id={`btn-streak-today-${tracker.id}`}
+              disabled={isDoneToday}
+            >
+              <Check size={13} />
+              <span>{isDoneToday ? 'Recorded today' : 'Log today'}</span>
+            </button>
+          )}
+
+          {onDelete && (
+            <button
+              type="button"
+              className={styles.deleteBtn}
+              onClick={onDelete}
+              id={`btn-delete-tracker-${tracker.id}`}
+              title="Delete tracker"
+              aria-label="Delete tracker"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Progress bar for series */}
       {isSeries && total > 0 && (
-        <div className={styles.trackerProgressBar}>
-          <div className="progress-track">
-            <div
-              className="progress-fill"
-              style={{ width: `${pct}%`, background: meta.color ?? 'var(--accent-primary)' }}
-            />
-          </div>
-          <span className={styles.pct}>{Math.round(pct)}%</span>
+        <div className={styles.hairlineBar}>
+          <div
+            className={styles.hairlineFill}
+            style={{ width: `${pct}%`, background: meta.color ?? 'var(--accent-primary)' }}
+          />
         </div>
       )}
 
-      {/* Day grid for series, 15 days per page */}
+      {/* Day grid for series */}
       {isSeries && total > 0 && (
         <>
-          <div className="day-grid">
+          <div className={styles.dayGrid}>
             {Array.from({ length: dayPageEnd - dayPageStart }, (_, idx) => {
               const i = dayPageStart + idx;
               const isCompleted = (meta.completedDays ?? []).includes(i);
-              const isToday = i === completed; // next day to complete
+              const isToday = i === completed;
               return (
                 <button
                   key={i}
                   type="button"
-                  className={`day-dot ${isCompleted ? 'day-dot--completed' : ''} ${isToday ? 'day-dot--today' : ''}`}
+                  className={`${styles.dayDot} ${isCompleted ? styles.dayDotCompleted : ''} ${isToday ? styles.dayDotCurrent : ''}`}
                   onClick={() => handleDayTap(i)}
-                  style={isCompleted ? { background: meta.color ?? 'var(--accent-primary)', borderColor: meta.color ?? 'var(--accent-primary)' } : {}}
                   title={`Day ${i + 1}`}
                   id={`day-dot-${tracker.id}-${i}`}
                 >
@@ -254,7 +323,7 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
                 aria-label="Previous 15 days"
                 id={`btn-tracker-days-prev-${tracker.id}`}
               >
-                <ChevronLeft size={14} />
+                <ChevronLeft size={13} />
               </button>
               <span className={styles.dayGridNavLabel}>
                 Days {dayPageStart + 1}–{dayPageEnd} of {total}
@@ -267,63 +336,67 @@ function TrackerCard({ tracker, onUpdate, onDelete }: { tracker: Item; onUpdate:
                 aria-label="Next 15 days"
                 id={`btn-tracker-days-next-${tracker.id}`}
               >
-                <ChevronRight size={14} />
+                <ChevronRight size={13} />
               </button>
             </div>
           )}
         </>
-      )}
-
-      {/* Today button for streak */}
-      {isStreak && (
-        <button
-          type="button"
-          className={styles.streakTodayBtn}
-          onClick={() => handleStreakTap()}
-          id={`btn-streak-today-${tracker.id}`}
-          style={{ background: (meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]) ? 'var(--color-success)' : meta.color ?? 'var(--accent-primary)' }}
-        >
-          {(meta.completedDates ?? []).includes(new Date().toISOString().split('T')[0]) ? '✅ Done today' : '✓ Mark today'}
-        </button>
       )}
     </div>
   );
 }
 
 function GoalCard({ goal, onDelete }: { goal: Item; onDelete?: (e: React.MouseEvent) => void }) {
-  const meta = goal.metadata as { targetAmount?: number; currentAmount?: number; currency?: string; isFinancial?: boolean; target?: number; current?: number };
-  const target = meta.targetAmount ?? meta.target ?? 0;
-  const current = meta.currentAmount ?? meta.current ?? 0;
-  const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+  const meta = goal.metadata as GoalMetadata;
+  const target = meta.targetAmount || 0;
+  const current = meta.currentAmount || 0;
+  const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
 
   return (
     <div className={styles.goalCard} id={`goal-card-${goal.id}`}>
-      <div className={styles.goalHeader}>
-        <Link href={`/track/${goal.id}`} className={styles.goalLink} id={`link-goal-${goal.id}`}>
-          <Star size={18} color="var(--color-goal)" />
-          <span className={styles.goalName}>{goal.title}</span>
-          <span className={styles.goalPct}>{Math.round(pct)}%</span>
+      <div className={styles.cardHeader}>
+        <Link href={`/track/${goal.id}`} className={styles.cardMainLink} id={`link-goal-${goal.id}`}>
+          <div className={styles.goalTitleArea}>
+            <div className={styles.goalTopRow}>
+              <h3 className={styles.cardTitle}>{goal.title}</h3>
+              <Badge variant={pct >= 100 ? 'success' : 'primary'} size="sm">
+                {pct}%
+              </Badge>
+            </div>
+            <div className={styles.goalAmounts}>
+              <span className={styles.monoStrong}>
+                {meta.isFinancial ? formatAmount(current) : current}
+              </span>
+              <span className={styles.monoMuted}>
+                {' '}/ {meta.isFinancial ? formatAmount(target) : target}
+              </span>
+            </div>
+          </div>
         </Link>
+
         {onDelete && (
           <button
             type="button"
-            className="btn btn-icon btn-ghost"
+            className={styles.deleteBtn}
             onClick={onDelete}
             id={`btn-delete-goal-${goal.id}`}
             title="Delete goal"
-            style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', padding: 4, flexShrink: 0 }}
+            aria-label="Delete goal"
           >
-            <Trash2 size={16} />
+            <Trash2 size={14} />
           </button>
         )}
       </div>
-      <Link href={`/track/${goal.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-        <div className="progress-track" style={{ marginTop: 8 }}>
-          <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
-        </div>
-        <div className={styles.goalAmounts}>
-          <span style={{ color: 'var(--color-success)' }}>{formatAmount(current)}</span>
-          <span style={{ color: 'var(--text-tertiary)' }}> / {formatAmount(target)}</span>
+
+      <Link href={`/track/${goal.id}`} className={styles.goalProgressLink}>
+        <div className={styles.hairlineBar}>
+          <div
+            className={styles.hairlineFill}
+            style={{
+              width: `${pct}%`,
+              background: pct >= 100 ? 'var(--color-success)' : 'var(--accent-primary)',
+            }}
+          />
         </div>
       </Link>
     </div>
@@ -331,33 +404,32 @@ function GoalCard({ goal, onDelete }: { goal: Item; onDelete?: (e: React.MouseEv
 }
 
 function ProjectCard({ project, onDelete }: { project: Item; onDelete?: (e: React.MouseEvent) => void }) {
-  const meta = project.metadata as { emoji?: string; color?: string; status?: string };
+  const meta = (project.metadata || {}) as { status?: string };
+  const status = meta.status || 'active';
+
   return (
     <div className={styles.projectCard} id={`project-card-${project.id}`}>
-      <Link href={`/track/${project.id}`} className={styles.projectMainLink} id={`link-project-${project.id}`}>
-        <span className={styles.projectEmoji}>{meta.emoji ?? '📁'}</span>
+      <Link href={`/projects/${project.id}`} className={styles.cardMainLink} id={`link-project-${project.id}`}>
         <div className={styles.projectInfo}>
-          <span className={styles.projectName}>{project.title}</span>
+          <h3 className={styles.cardTitle}>{project.title}</h3>
           {project.content && (
-            <span className={styles.projectDesc}>{project.content.slice(0, 60)}</span>
+            <p className={styles.projectDesc}>{project.content.slice(0, 80)}</p>
           )}
         </div>
-        {meta.status && (
-          <span className={`badge ${meta.status === 'active' ? 'badge-success' : 'badge-neutral'}`}>
-            {meta.status}
-          </span>
-        )}
+        <Badge variant={status === 'active' ? 'primary' : 'default'} size="sm">
+          {status}
+        </Badge>
       </Link>
       {onDelete && (
         <button
           type="button"
-          className="btn btn-icon btn-ghost"
+          className={styles.deleteBtn}
           onClick={onDelete}
           id={`btn-delete-project-${project.id}`}
           title="Delete project"
-          style={{ color: 'var(--text-tertiary)', marginLeft: 8, padding: 4, flexShrink: 0 }}
+          aria-label="Delete project"
         >
-          <Trash2 size={16} />
+          <Trash2 size={14} />
         </button>
       )}
     </div>
@@ -366,7 +438,7 @@ function ProjectCard({ project, onDelete }: { project: Item; onDelete?: (e: Reac
 
 export default function TrackPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 32, color: 'var(--text-tertiary)' }}>Loading…</div>}>
+    <Suspense fallback={<div style={{ padding: 32, color: 'var(--text-muted)' }}>Loading…</div>}>
       <TrackContent />
     </Suspense>
   );

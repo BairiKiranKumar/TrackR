@@ -8,11 +8,17 @@ import {
   Folder,
   FileText,
   Search,
+  Calendar,
   CheckSquare,
   Target,
   Trophy,
   DollarSign,
+  Wallet,
   ArrowLeftRight,
+  PieChart,
+  Clock,
+  TrendingUp,
+  BarChart3,
   Settings,
   Plus,
   X,
@@ -42,14 +48,20 @@ const TRACKR_ITEMS: NavEntry[] = [
 ];
 
 const PLAN_ITEMS: NavEntry[] = [
+  { href: '/today',              icon: Calendar,    label: 'Today',    id: 'sidenav-today' },
   { href: '/track?tab=tasks',    icon: CheckSquare, label: 'Tasks',    id: 'sidenav-tasks',    tab: 'tasks' },
   { href: '/track?tab=trackers', icon: Target,      label: 'Trackers', id: 'sidenav-trackers', tab: 'trackers' },
   { href: '/track?tab=goals',    icon: Trophy,      label: 'Goals',    id: 'sidenav-goals',    tab: 'goals' },
 ];
 
 const MONEY_ITEMS: NavEntry[] = [
-  { href: '/money',                   icon: DollarSign,     label: 'Overview',     id: 'sidenav-money-overview', exact: true },
-  { href: '/money?tab=transactions',  icon: ArrowLeftRight, label: 'Transactions', id: 'sidenav-money-txns',     tab: 'transactions' },
+  { href: '/money',                  icon: DollarSign,     label: 'Overview',     id: 'sidenav-money-overview', exact: true },
+  { href: '/money?tab=accounts',     icon: Wallet,         label: 'Accounts',     id: 'sidenav-money-accs',     tab: 'accounts' },
+  { href: '/money?tab=transactions', icon: ArrowLeftRight, label: 'Transactions', id: 'sidenav-money-txns',     tab: 'transactions' },
+  { href: '/money?tab=budgets',      icon: PieChart,       label: 'Budgets',      id: 'sidenav-money-budgets',  tab: 'budgets' },
+  { href: '/money?tab=planning',     icon: Clock,          label: 'Planning',     id: 'sidenav-money-planning', tab: 'planning' },
+  { href: '/money/investments',      icon: TrendingUp,     label: 'Investments',  id: 'sidenav-money-investments' },
+  { href: '/money/reports',          icon: BarChart3,      label: 'Reports',      id: 'sidenav-money-reports' },
 ];
 
 const FOOTER_ITEMS: NavEntry[] = [
@@ -105,6 +117,9 @@ function SideNavInner() {
         return pathname === '/money' && (!currentTab || currentTab === 'overview');
       }
       return pathname === entry.href;
+    }
+    if (entry.href === '/') {
+      return pathname === '/';
     }
     return pathname.startsWith(entry.href);
   }

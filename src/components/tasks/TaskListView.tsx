@@ -12,11 +12,13 @@ import {
   Calendar,
   Clock,
   CheckSquare,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { dataService } from '@/lib/services/DataService';
 import { Item, TaskMetadata } from '@/types';
+import { Button } from '@/components/ui';
 import styles from './TaskListView.module.css';
 
 export type TaskViewMode = 'today' | 'upcoming' | 'overdue' | 'completed' | 'all';
@@ -299,15 +301,16 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
             disabled={addingTask}
             id="input-quick-add-task"
           />
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary btn-sm"
+            variant="primary"
+            size="sm"
             disabled={!newTaskTitle.trim() || addingTask}
             id="btn-submit-quick-add"
           >
             <Plus size={14} />
             <span>Add</span>
-          </button>
+          </Button>
         </form>
       )}
 
@@ -323,18 +326,18 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
       {/* Error state */}
       {!loading && error && (
         <div className={styles.errorState}>
-          <AlertCircle size={32} />
+          <AlertCircle size={28} />
           <p>{error}</p>
-          <button className="btn btn-secondary btn-sm" onClick={loadTasks}>
+          <Button variant="secondary" size="sm" onClick={loadTasks}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Empty state */}
       {!loading && !error && tasks.length === 0 && (
         <div className={styles.emptyState}>
-          <CheckCircle2 size={40} className={styles.emptyIcon} />
+          <CheckCircle2 size={36} className={styles.emptyIcon} />
           <h2 className={styles.emptyTitle}>{currentMeta.emptyTitle}</h2>
           <p className={styles.emptySubtitle}>{currentMeta.emptySub}</p>
         </div>
@@ -356,7 +359,7 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
             return (
               <div
                 key={task.id}
-                className={`${styles.taskRow} ${isDone ? styles.taskDone : ''}`}
+                className={`${styles.taskRow} ${isDone ? styles.taskDone : ''} ${isOverdue ? styles.taskRowOverdue : ''}`}
                 id={`task-row-${task.id}`}
               >
                 {/* Completion Checkbox */}
@@ -368,9 +371,9 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
                   aria-label={isDone ? 'Mark uncompleted' : 'Mark completed'}
                 >
                   {isDone ? (
-                    <CheckCircle2 size={20} color="var(--color-success, #10b981)" />
+                    <CheckCircle2 size={18} className={styles.checkedIcon} />
                   ) : (
-                    <Circle size={20} />
+                    <Circle size={18} />
                   )}
                 </button>
 
@@ -405,7 +408,7 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
                           isOverdue ? styles.dateOverdue : isDueToday ? styles.dateToday : ''
                         }`}
                       >
-                        <Calendar size={12} />
+                        <Calendar size={11} />
                         <span>
                           {isDueToday
                             ? 'Today'
@@ -419,7 +422,7 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
                     {/* Project Link */}
                     {project && (
                       <span className={styles.projectLink} title={project.title}>
-                        <Folder size={12} />
+                        <Folder size={11} />
                         <span>{project.title}</span>
                       </span>
                     )}
@@ -427,7 +430,8 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
                     {/* Blocked indicator */}
                     {blockers.length > 0 && (
                       <span className={styles.blockedBadge} title={`Blocked by: ${blockers.join(', ')}`}>
-                        ⚠️ Blocked
+                        <AlertTriangle size={11} />
+                        <span>Blocked</span>
                       </span>
                     )}
                   </div>
@@ -443,7 +447,7 @@ export function TaskListView({ view, title, subtitle, showTabs = true }: TaskLis
                     aria-label={`Delete ${task.title}`}
                     title="Delete task"
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>

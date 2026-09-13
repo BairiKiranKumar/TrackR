@@ -9,25 +9,31 @@
 :root {
   /* Colors — Dark mode (default) · Neutral slate/obsidian foundation */
   --bg-primary:     #09090B;
-  --bg-secondary:   #111114;
-  --bg-tertiary:    #18181D;
+  --bg-base:        #09090B;
+  --bg-secondary:   #111115;
+  --bg-surface:     #111115;
+  --bg-tertiary:    #16161C;
   --bg-card:        #131317;
-  --bg-card-hover:  #1A1A21;
-  --bg-elevated:    #202028;
-  --bg-input:       #121216;
+  --bg-card-hover:  #181820;
+  --bg-elevated:    #1D1D25;
+  --bg-surface-elevated: #1D1D25;
+  --bg-input:       #111115;
   --bg-overlay:     rgba(0, 0, 0, 0.75);
-  --bg-header:      rgba(9, 9, 11, 0.88);
-  --bg-nav-glass:   rgba(9, 9, 11, 0.88);
+  --bg-header:      rgba(9, 9, 11, 0.90);
+  --bg-nav-glass:   rgba(9, 9, 11, 0.90);
 
   /* Text */
   --text-primary:   #F4F4F6;
   --text-secondary: #9E9EAD;
   --text-tertiary:  #636375;
+  --text-muted:     #636375;
   --text-inverse:   #09090B;
 
   /* Brand / Accent · Disciplined TRACKR Violet */
   --accent-primary:   #6366F1;  /* Refined Indigo/Violet */
+  --accent-hover:     #4F46E5;
   --accent-secondary: #818CF8;
+  --accent-subtle:    rgba(99, 102, 241, 0.10);
   --accent-glow:      rgba(99, 102, 241, 0.12);
   --accent-border:    rgba(99, 102, 241, 0.28);
 
@@ -60,12 +66,12 @@
   --shadow-card: none;
   --shadow-glow: 0 0 16px var(--accent-glow);
 
-  /* Radius — Strict hierarchy: 6-8px controls, 8-10px surfaces, 12-14px dialogs, pills only for tags */
+  /* Radius — Strict hierarchy: 6px controls, 8px inputs, 10px cards/surfaces, 12px dialogs/modals, pills only for tags/badges */
   --radius-xs:  4px;
   --radius-sm:  6px;
   --radius-md:  8px;
   --radius-lg:  10px;
-  --radius-xl:  14px;
+  --radius-xl:  12px;
   --radius-full: 9999px;
 
   /* Spacing */
@@ -793,5 +799,17 @@ select.input {
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
+}
+
+/* ─── Accessibility & Reduced Motion ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 

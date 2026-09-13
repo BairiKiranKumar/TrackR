@@ -536,7 +536,7 @@ export default function InboxPage() {
                           <option value="">(No Project)</option>
                           {projects.map(p => (
                             <option key={p.id} value={p.id}>
-                              📁 {p.title}
+                              {p.title}
                             </option>
                           ))}
                         </select>
@@ -798,7 +798,9 @@ export default function InboxPage() {
                     id={`btn-bulk-choose-project-${p.id}`}
                   >
                     <div className={styles.candidateInfo}>
-                      <span className={styles.candidateEmoji}>📁</span>
+                      <span className={styles.candidateEmoji} style={{ display: 'inline-flex', color: 'var(--text-secondary)' }}>
+                        <Folder size={16} />
+                      </span>
                       <div className={styles.candidateTexts}>
                         <span className={styles.candidateTitle}>{p.title}</span>
                       </div>

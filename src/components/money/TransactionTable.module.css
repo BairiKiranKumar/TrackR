@@ -1,106 +1,117 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-3);
   width: 100%;
 }
 
 .filterBar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-2);
   align-items: center;
-  background: var(--bg-card, #131317);
-  padding: 12px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  background: var(--bg-surface);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
 }
 
 .searchInput {
   flex: 1;
-  min-width: 200px;
-  padding: 8px 12px;
-  background: var(--bg-input, #121216);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: 8px;
-  color: var(--text-primary, #f4f4f6);
-  font-size: 0.88rem;
+  min-width: 180px;
+  padding: 6px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
   outline: none;
+  transition: border-color var(--transition-fast);
 }
 
 .searchInput:focus {
-  border-color: var(--accent-primary, #6366f1);
+  border-color: var(--border-focus);
 }
 
 .select {
-  padding: 8px 12px;
-  background: var(--bg-input, #121216);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: 8px;
-  color: var(--text-primary, #f4f4f6);
-  font-size: 0.88rem;
+  padding: 6px 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8125rem;
   outline: none;
   cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.select:focus {
+  border-color: var(--border-focus);
 }
 
 .bulkBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background: var(--accent-glow, rgba(99, 102, 241, 0.12));
-  border: 1px solid var(--accent-border, rgba(99, 102, 241, 0.3));
-  border-radius: 10px;
+  padding: 8px 14px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
   animation: fadeIn 0.15s ease-out;
 }
 
 .bulkText {
-  font-size: 0.88rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--accent-secondary, #818cf8);
+  color: var(--accent-primary);
 }
 
 .bulkActions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .bulkBtn {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.82rem;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.15s;
+  transition: background var(--transition-fast);
 }
 
 .bulkDeleteBtn {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--color-danger, #ef4444);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.25);
 }
 
 .bulkDeleteBtn:hover {
-  background: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1px;
+  background: var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .empty {
-  padding: 48px 16px;
+  padding: var(--space-8) var(--space-4);
   text-align: center;
-  color: var(--text-tertiary, #636375);
-  background: var(--bg-card, #131317);
-  border-radius: 14px;
-  border: 1px dashed var(--border-default, rgba(255, 255, 255, 0.1));
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-subtle);
+  font-size: 0.875rem;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 0; transform: translateY(-3px); }
   to { opacity: 1; transform: translateY(0); }
 }

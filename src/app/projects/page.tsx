@@ -14,18 +14,29 @@ import {
   ArrowRight,
   TrendingUp,
   X,
+  Calendar,
   Clock,
+  Zap,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { dataService } from '@/lib/services/DataService';
-import { Item, ProjectContextSummary, ProjectMetadata } from '@/types';
+import { Item, ProjectContextSummary, ProjectMetadata, ProjectStatus } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
+import { Button, Modal, Badge, EmptyState } from '@/components/ui';
 import styles from './page.module.css';
 
 interface ProjectWithContext {
   project: Item;
   context: ProjectContextSummary | null;
 }
+
+const STATUS_LABELS: Record<ProjectStatus, { label: string; variant: 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' }> = {
+  active: { label: 'Active', variant: 'primary' },
+  on_hold: { label: 'On Hold', variant: 'warning' },
+  completed: { label: 'Completed', variant: 'success' },
+  paused: { label: 'Paused', variant: 'default' },
+  archived: { label: 'Archived', variant: 'default' },
+};
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -37,8 +48,9 @@ export default function ProjectsPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newEmoji, setNewEmoji] = useState('📁');
-  const [newColor, setNewColor] = useState('#6366f1');
+  const [newStatus, setNewStatus] = useState<ProjectStatus>('active');
+  const [newTargetDate, setNewTargetDate] = useState('');
+  const [newColor, setNewColor] = useState('#8b5cf6');
   const [creating, setCreating] = useState(false);
 
   const projects = useMemo(() => {
@@ -87,9 +99,9 @@ export default function ProjectsPage() {
     setCreating(true);
     try {
       const metadata: ProjectMetadata = {
-        emoji: newEmoji,
         color: newColor,
-        status: 'active',
+        status: newStatus,
+        targetDate: newTargetDate.trim() || undefined,
         description: newDesc.trim(),
       };
       const created = await dataService.createItem({
@@ -102,7 +114,8 @@ export default function ProjectsPage() {
       setShowNewModal(false);
       setNewTitle('');
       setNewDesc('');
-      router.push(`/track/${created.id}`);
+      setNewTargetDate('');
+      router.push(`/projects/${created.id}`);
     } catch (err) {
       console.error('Failed to create project', err);
     } finally {
@@ -124,37 +137,32 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerTitleRow}>
-          <div className={styles.titleGroup}>
-            <div className={styles.iconBadge}>
-              <Folder size={22} />
-            </div>
-            <div>
-              <h1 className={styles.title}>Projects</h1>
-              <p className={styles.subtitle}>
-                Organize your work into cohesive initiatives. Every task, note, and expense connected in context.
-              </p>
-            </div>
+          <div>
+            <h1 className={styles.title}>Projects</h1>
+            <p className={styles.subtitle}>
+              Unified initiatives connecting tasks, notes, goals, trackers, and financials in context.
+            </p>
           </div>
 
           <div className={styles.headerActions}>
-            <button
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => setShowNewModal(true)}
               id="btn-projects-new"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               <span>New Project</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Search */}
         <div className={styles.searchBar}>
-          <Search size={16} className={styles.searchIcon} />
+          <Search size={15} className={styles.searchIcon} />
           <input
             type="search"
             className={styles.searchInput}
-            placeholder="Search projects by name, goal, or tags…"
+            placeholder="Filter projects by title, description, or tag…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             id="input-projects-search"
@@ -174,43 +182,41 @@ export default function ProjectsPage() {
       {/* Main Content */}
       <div className={styles.content}>
         {projects.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>
-              <Folder size={44} />
-            </div>
-            <h2 className={styles.emptyTitle}>No Projects Yet</h2>
-            <p className={styles.emptySubtitle}>
-              Projects connect your daily tasks, notes, habits, and expenses into focused outcomes.
-            </p>
-            <div className={styles.emptyActions}>
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowNewModal(true)}
-              >
-                <Plus size={16} />
-                <span>Create First Project</span>
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={handleLoadSample}
-              >
-                <Package size={16} />
-                <span>Load Sample Project</span>
-              </button>
-            </div>
-          </div>
+          <EmptyState
+            icon={<Folder size={32} />}
+            title="No projects yet"
+            description="Create your first project to organize tasks, notes, trackers, and expenses into focused outcomes."
+            action={
+              <div className={styles.emptyActions}>
+                <Button variant="primary" onClick={() => setShowNewModal(true)}>
+                  <Plus size={15} />
+                  <span>Create First Project</span>
+                </Button>
+                <Button variant="secondary" onClick={handleLoadSample}>
+                  <Package size={15} />
+                  <span>Load Sample Project</span>
+                </Button>
+              </div>
+            }
+          />
         ) : filteredProjects.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p className={styles.emptySubtitle}>
-              No projects found matching &quot;{searchQuery}&quot;.
-            </p>
-          </div>
+          <EmptyState
+            title="No matching projects"
+            description={`No projects found matching "${searchQuery}".`}
+            action={
+              <Button variant="secondary" onClick={() => setSearchQuery('')}>
+                Clear Filter
+              </Button>
+            }
+          />
         ) : (
-          <div className={styles.projectGrid}>
+          <div className={styles.projectList}>
             {filteredProjects.map(({ project, context }) => {
               const meta = (project.metadata || {}) as ProjectMetadata;
-              const emoji = meta.emoji || '📁';
-              const color = meta.color || '#6366f1';
+              const color = meta.color || 'var(--accent-primary)';
+              const status: ProjectStatus = meta.status || 'active';
+              const statusConfig = STATUS_LABELS[status] || STATUS_LABELS.active;
+
               const openTasks = context?.openTasksCount ?? 0;
               const completedTasks = context?.completedTasksCount ?? 0;
               const totalTasks = openTasks + completedTasks;
@@ -218,84 +224,120 @@ export default function ProjectsPage() {
               const notesCount = context?.notes.length ?? 0;
               const expensesTotal = context?.totalExpenses ?? 0;
               const trackersCount = context?.trackers.length ?? 0;
+              const goalsCount = context?.goals.length ?? 0;
+
+              // Top actionable next task
+              const nextAction = context?.nextActions?.[0];
 
               return (
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}`}
-                  className={styles.projectCard}
-                  style={{ '--project-accent': color } as React.CSSProperties}
+                  className={styles.projectRow}
                 >
-                  <div className={styles.cardAccentBar} />
+                  <div
+                    className={styles.colorStrip}
+                    style={{ backgroundColor: color }}
+                  />
 
-                  <div className={styles.cardHeader}>
-                    <div className={styles.cardTitleGroup}>
-                      <span className={styles.projectEmoji}>{emoji}</span>
-                      <h3 className={styles.projectTitle}>{project.title}</h3>
-                    </div>
-                    <ArrowRight size={16} className={styles.cardArrow} />
-                  </div>
+                  <div className={styles.rowMain}>
+                    {/* Top line: Title, Status, Progress */}
+                    <div className={styles.rowHeader}>
+                      <div className={styles.titleArea}>
+                        <h2 className={styles.projectTitle}>{project.title}</h2>
+                        <Badge variant={statusConfig.variant} size="sm">
+                          {statusConfig.label}
+                        </Badge>
+                      </div>
 
-                  {project.content && (
-                    <p className={styles.projectDesc}>{project.content}</p>
-                  )}
-
-                  {/* Task Progress */}
-                  <div className={styles.progressSection}>
-                    <div className={styles.progressHeader}>
-                      <span className={styles.progressLabel}>
-                        <CheckCircle2 size={13} />
-                        <span>Tasks</span>
-                      </span>
-                      <span className={styles.progressValue}>
-                        {completedTasks} / {totalTasks} ({progressPct}%)
-                      </span>
-                    </div>
-                    <div className={styles.progressBar}>
-                      <div
-                        className={styles.progressFill}
-                        style={{ width: `${progressPct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Metrics Row */}
-                  <div className={styles.metricsRow}>
-                    <div className={styles.metricItem} title={`${notesCount} linked notes`}>
-                      <FileText size={13} className={styles.metricIcon} />
-                      <span>{notesCount} note{notesCount !== 1 ? 's' : ''}</span>
+                      <div className={styles.rowTopRight}>
+                        {totalTasks > 0 && (
+                          <span className={styles.progressPercent}>
+                            {progressPct}%
+                          </span>
+                        )}
+                        <ArrowRight size={15} className={styles.rowArrow} />
+                      </div>
                     </div>
 
-                    {expensesTotal > 0 && (
-                      <div className={styles.metricItem} title={`Total tracked expenses: ₹${expensesTotal.toLocaleString('en-IN')}`}>
-                        <DollarSign size={13} className={styles.metricIcon} />
-                        <span>₹{expensesTotal.toLocaleString('en-IN')}</span>
+                    {/* Next Action unblocked row */}
+                    {nextAction && (
+                      <div className={styles.nextActionRow}>
+                        <Zap size={13} className={styles.nextActionIcon} />
+                        <span className={styles.nextActionLabel}>Next:</span>
+                        <span className={styles.nextActionTitle}>{nextAction.title}</span>
                       </div>
                     )}
 
-                    {trackersCount > 0 && (
-                      <div className={styles.metricItem} title={`${trackersCount} active trackers`}>
-                        <TrendingUp size={13} className={styles.metricIcon} />
-                        <span>{trackersCount} tracker{trackersCount > 1 ? 's' : ''}</span>
-                      </div>
+                    {/* Description excerpt */}
+                    {project.content && !nextAction && (
+                      <p className={styles.projectDesc}>{project.content}</p>
                     )}
 
-                    <div className={styles.metricItem} title={`Last updated: ${new Date(project.updatedAt).toLocaleString()}`}>
-                      <Clock size={12} className={styles.metricIcon} />
-                      <span>{formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}</span>
-                    </div>
-                  </div>
-
-                  {/* Tags */}
-                  {project.tags && project.tags.length > 0 && (
-                    <div className={styles.tagsRow}>
-                      {project.tags.map(t => (
-                        <span key={t} className={styles.tagPill}>
-                          #{t}
+                    {/* Context Metrics and Info */}
+                    <div className={styles.contextMetrics}>
+                      <div className={styles.metricItem} title={`${completedTasks} of ${totalTasks} tasks completed`}>
+                        <CheckCircle2 size={13} className={styles.metricIcon} />
+                        <span>
+                          {totalTasks > 0 ? `${completedTasks}/${totalTasks} tasks` : '0 tasks'}
                         </span>
-                      ))}
+                      </div>
+
+                      {notesCount > 0 && (
+                        <div className={styles.metricItem} title={`${notesCount} connected notes`}>
+                          <FileText size={13} className={styles.metricIcon} />
+                          <span>{notesCount} note{notesCount !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+
+                      {expensesTotal > 0 && (
+                        <div className={styles.metricItem} title={`Total tracked expenses: ₹${expensesTotal.toLocaleString('en-IN')}`}>
+                          <DollarSign size={13} className={styles.metricIcon} />
+                          <span className={styles.monoNumber}>₹{expensesTotal.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
+
+                      {trackersCount > 0 && (
+                        <div className={styles.metricItem} title={`${trackersCount} connected trackers`}>
+                          <TrendingUp size={13} className={styles.metricIcon} />
+                          <span>{trackersCount} tracker{trackersCount > 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+
+                      {goalsCount > 0 && (
+                        <div className={styles.metricItem} title={`${goalsCount} linked goals`}>
+                          <span>{goalsCount} goal{goalsCount > 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+
+                      {meta.targetDate && (
+                        <div className={styles.metricItem} title={`Target date: ${meta.targetDate}`}>
+                          <Calendar size={12} className={styles.metricIcon} />
+                          <span>{meta.targetDate}</span>
+                        </div>
+                      )}
+
+                      <div className={styles.metricSpacer} />
+
+                      <div className={styles.updatedAt} title={`Updated ${new Date(project.updatedAt).toLocaleString()}`}>
+                        <Clock size={11} />
+                        <span>{formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}</span>
+                      </div>
                     </div>
-                  )}
+
+                    {/* Hairline progress bar */}
+                    {totalTasks > 0 && (
+                      <div className={styles.hairlineBar}>
+                        <div
+                          className={styles.hairlineFill}
+                          style={{
+                            width: `${progressPct}%`,
+                            backgroundColor: color,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </Link>
               );
             })}
@@ -304,99 +346,111 @@ export default function ProjectsPage() {
       </div>
 
       {/* New Project Modal */}
-      {showNewModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowNewModal(false)}>
-          <div
-            className={styles.modalBox}
-            onClick={e => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Create new project"
-            onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowNewModal(false); } }}
-          >
-            <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Create New Project</h3>
-              <button
-                className={styles.closeBtn}
-                onClick={() => setShowNewModal(false)}
-                aria-label="Close"
+      <Modal
+        isOpen={showNewModal}
+        onClose={() => setShowNewModal(false)}
+        title="Create New Project"
+        description="Organize related tasks, notes, goals, and expenses into a focused initiative."
+        footer={
+          <div className={styles.modalFooter}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowNewModal(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateProject}
+              disabled={creating || !newTitle.trim()}
+              loading={creating}
+            >
+              Create Project
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={handleCreateProject} className={styles.modalForm}>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="project-title-input">
+              Project Name <span className={styles.requiredStar}>*</span>
+            </label>
+            <input
+              id="project-title-input"
+              type="text"
+              className={styles.formInput}
+              placeholder="e.g. Website Overhaul, Tax Filing 2026, Q3 Hiring"
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="project-desc-input">
+              Outcome & Scope
+            </label>
+            <textarea
+              id="project-desc-input"
+              className={styles.formTextarea}
+              placeholder="What does success look like for this initiative?"
+              rows={3}
+              value={newDesc}
+              onChange={e => setNewDesc(e.target.value)}
+            />
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="project-status-select">
+                Initial Status
+              </label>
+              <select
+                id="project-status-select"
+                className={styles.formSelect}
+                value={newStatus}
+                onChange={e => setNewStatus(e.target.value as ProjectStatus)}
               >
-                <X size={18} />
-              </button>
+                <option value="active">Active</option>
+                <option value="on_hold">On Hold</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+              </select>
             </div>
 
-            <form onSubmit={handleCreateProject} className={styles.modalForm}>
-              <div className={styles.formRow}>
-                <div className={styles.emojiPickerWrap}>
-                  <label className={styles.formLabel}>Emoji</label>
-                  <input
-                    type="text"
-                    className={styles.emojiInput}
-                    value={newEmoji}
-                    maxLength={2}
-                    onChange={e => setNewEmoji(e.target.value)}
-                  />
-                </div>
-                <div className={styles.titleInputWrap}>
-                  <label className={styles.formLabel}>Project Name</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    placeholder="e.g. YouTube Channel, Home Renovation"
-                    value={newTitle}
-                    onChange={e => setNewTitle(e.target.value)}
-                    required
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Description / Target Outcome</label>
-                <textarea
-                  className={styles.textareaInput}
-                  placeholder="What does success look like for this initiative?"
-                  rows={3}
-                  value={newDesc}
-                  onChange={e => setNewDesc(e.target.value)}
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Accent Color</label>
-                <div className={styles.colorPills}>
-                  {['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444'].map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`${styles.colorPill} ${newColor === c ? styles.colorPillActive : ''}`}
-                      style={{ backgroundColor: c }}
-                      onClick={() => setNewColor(c)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowNewModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={creating || !newTitle.trim()}
-                >
-                  {creating ? 'Creating…' : 'Create Project'}
-                </button>
-              </div>
-            </form>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="project-target-date">
+                Target Date
+              </label>
+              <input
+                id="project-target-date"
+                type="date"
+                className={styles.formInput}
+                value={newTargetDate}
+                onChange={e => setNewTargetDate(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
-      )}
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Accent Color</label>
+            <div className={styles.colorPills}>
+              {['#8b5cf6', '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#ef4444'].map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`${styles.colorPill} ${newColor === c ? styles.colorPillActive : ''}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setNewColor(c)}
+                  aria-label={`Select color ${c}`}
+                />
+              ))}
+            </div>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

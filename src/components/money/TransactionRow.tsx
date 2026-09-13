@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Copy, Trash2 } from 'lucide-react';
+import { Copy, Trash2, ArrowUpRight, ArrowDownLeft, ArrowRightLeft } from 'lucide-react';
 import { FinanceTransaction } from '@/types/finance';
 import styles from './TransactionRow.module.css';
 
@@ -21,7 +21,6 @@ export function TransactionRow({
   transaction,
   accountName,
   categoryName,
-  categoryIcon,
   selected = false,
   onSelect,
   onClick,
@@ -30,7 +29,6 @@ export function TransactionRow({
 }: TransactionRowProps) {
   const isIncome = transaction.type === 'income';
   const isTransfer = transaction.type === 'transfer';
-  const icon = isTransfer ? '⇄' : categoryIcon || (isIncome ? '💰' : '💳');
 
   const title =
     transaction.payee ||
@@ -50,18 +48,35 @@ export function TransactionRow({
             onChange={e => onSelect(e.target.checked)}
             className={styles.checkbox}
             id={`txn-select-${transaction.id}`}
+            aria-label={`Select ${title}`}
           />
         )}
-        <div className={styles.iconWrap} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>{icon}</div>
-        <div className={styles.meta} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+        <div
+          className={styles.iconWrap}
+          onClick={onClick}
+          style={{ cursor: onClick ? 'pointer' : 'default' }}
+        >
+          {isTransfer ? (
+            <ArrowRightLeft size={14} className={styles.transferIcon} />
+          ) : isIncome ? (
+            <ArrowUpRight size={14} className={styles.incomeIcon} />
+          ) : (
+            <ArrowDownLeft size={14} className={styles.expenseIcon} />
+          )}
+        </div>
+        <div
+          className={styles.meta}
+          onClick={onClick}
+          style={{ cursor: onClick ? 'pointer' : 'default' }}
+        >
           <span className={styles.payee}>{title}</span>
           <div className={styles.subRow}>
-            <span>{transaction.date}</span>
+            <span className={styles.dateText}>{transaction.date}</span>
             {accountName && <span className={styles.accountChip}>{accountName}</span>}
             {categoryName && !transaction.payee ? null : categoryName ? (
-              <span>• {categoryName}</span>
+              <span className={styles.categoryChip}>{categoryName}</span>
             ) : null}
-            {transaction.note && <span>• {transaction.note}</span>}
+            {transaction.note && <span className={styles.noteText}>• {transaction.note}</span>}
           </div>
         </div>
       </div>
@@ -86,8 +101,9 @@ export function TransactionRow({
               className={styles.actionBtn}
               title="Duplicate to today"
               id={`btn-dup-${transaction.id}`}
+              aria-label="Duplicate transaction"
             >
-              <Copy size={15} />
+              <Copy size={13} />
             </button>
           )}
           {onDelete && (
@@ -96,8 +112,9 @@ export function TransactionRow({
               className={styles.actionBtn}
               title="Delete transaction"
               id={`btn-del-${transaction.id}`}
+              aria-label="Delete transaction"
             >
-              <Trash2 size={15} />
+              <Trash2 size={13} />
             </button>
           )}
         </div>

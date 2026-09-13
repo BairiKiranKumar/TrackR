@@ -2,7 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import { FinanceAccount } from '@/types/finance';
+import { Badge } from '@/components/ui';
 import styles from './AccountCard.module.css';
 
 interface AccountCardProps {
@@ -19,15 +21,17 @@ export function AccountCard({ account, onClick }: AccountCardProps) {
       <div className={styles.header}>
         <div className={styles.accountInfo}>
           <span className={styles.name}>{account.name}</span>
-          {account.institution && (
-            <span className={styles.institution}>{account.institution}</span>
-          )}
+          <span className={styles.metaText}>
+            {account.institution ? `${account.institution} · ` : ''}
+            {account.type.replace('_', ' ')} · {account.currency}
+          </span>
         </div>
-        <span className={styles.typeBadge}>{account.type.replace('_', ' ')}</span>
+        <Badge variant="default" size="sm">
+          {account.type.replace('_', ' ')}
+        </Badge>
       </div>
 
       <div className={styles.balanceRow}>
-        <span className={styles.balanceLabel}>Current Balance</span>
         <span
           className={`${styles.balanceValue} ${
             isCreditOrLoan
@@ -45,6 +49,10 @@ export function AccountCard({ account, onClick }: AccountCardProps) {
             maximumFractionDigits: 2,
           })}
         </span>
+        <div className={styles.viewLink}>
+          <span>View</span>
+          <ArrowRight size={13} />
+        </div>
       </div>
     </div>
   );

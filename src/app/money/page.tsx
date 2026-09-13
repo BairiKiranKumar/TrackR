@@ -14,7 +14,7 @@ import {
   FileText,
   Sliders,
   UploadCloud,
-  X,
+  ArrowRight,
 } from 'lucide-react';
 import {
   FinanceAccount,
@@ -37,6 +37,7 @@ import { CashFlowForecast } from '@/components/money/CashFlowForecast';
 import { QuickExpense } from '@/components/money/QuickExpense';
 import { TransferForm } from '@/components/money/TransferForm';
 import { CategorySelect } from '@/components/money/CategorySelect';
+import { Button, Modal, Badge } from '@/components/ui';
 import styles from './page.module.css';
 
 type Tab = 'overview' | 'transactions' | 'accounts' | 'budgets' | 'planning';
@@ -178,48 +179,51 @@ export default function MoneyPage() {
     <div className={styles.page}>
       {/* Page Header */}
       <div className={styles.header}>
-        <h1 className={styles.title}>Finance</h1>
+        <div>
+          <h1 className={styles.title}>Finance</h1>
+          <p className={styles.subtitle}>Net worth, cash flow, accounts, and disciplined budget limits.</p>
+        </div>
         <div className={styles.headerActions}>
-          <button
+          <Button
             id="btn-open-transfer"
-            className="btn btn-secondary"
+            variant="secondary"
             onClick={() => setShowTransferModal(true)}
             disabled={accounts.length < 2}
           >
-            <ArrowRightLeft size={16} />
+            <ArrowRightLeft size={15} />
             <span>Transfer</span>
-          </button>
-          <button
+          </Button>
+          <Button
             id="btn-open-add-account"
-            className="btn btn-primary"
+            variant="primary"
             onClick={() => setShowAddAccountModal(true)}
           >
-            <Plus size={16} />
+            <Plus size={15} />
             <span>New Account</span>
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Sub-nav quick links to deeper features */}
       <div className={styles.subnav}>
         <Link href="/money/reports" className={styles.subnavLink} id="link-finance-reports">
-          <BarChart3 size={15} color="var(--accent-primary, #6366f1)" />
-          <span>Reports (10)</span>
+          <BarChart3 size={14} />
+          <span>Reports</span>
         </Link>
         <Link href="/money/investments" className={styles.subnavLink} id="link-finance-investments">
-          <TrendingUp size={15} color="var(--color-success, #10b981)" />
+          <TrendingUp size={14} />
           <span>Investments</span>
         </Link>
         <Link href="/money/debts" className={styles.subnavLink} id="link-finance-debts">
-          <Wallet size={15} color="var(--color-warning, #f59e0b)" />
+          <Wallet size={14} />
           <span>Debts</span>
         </Link>
         <Link href="/money/rules" className={styles.subnavLink} id="link-finance-rules">
-          <Sliders size={15} color="var(--color-info, #3b82f6)" />
+          <Sliders size={14} />
           <span>Auto Rules</span>
         </Link>
         <Link href="/money/import" className={styles.subnavLink} id="link-finance-import">
-          <UploadCloud size={15} />
+          <UploadCloud size={14} />
           <span>CSV Import/Export</span>
         </Link>
       </div>
@@ -231,7 +235,7 @@ export default function MoneyPage() {
           className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.tabBtnActive : ''}`}
           onClick={() => setActiveTab('overview')}
         >
-          <Wallet size={17} />
+          <Wallet size={15} />
           <span>Overview</span>
         </button>
         <button
@@ -239,7 +243,7 @@ export default function MoneyPage() {
           className={`${styles.tabBtn} ${activeTab === 'transactions' ? styles.tabBtnActive : ''}`}
           onClick={() => setActiveTab('transactions')}
         >
-          <FileText size={17} />
+          <FileText size={15} />
           <span>Transactions ({transactions.length})</span>
         </button>
         <button
@@ -247,7 +251,7 @@ export default function MoneyPage() {
           className={`${styles.tabBtn} ${activeTab === 'accounts' ? styles.tabBtnActive : ''}`}
           onClick={() => setActiveTab('accounts')}
         >
-          <Layers size={17} />
+          <Layers size={15} />
           <span>Accounts ({accounts.length})</span>
         </button>
         <button
@@ -255,7 +259,7 @@ export default function MoneyPage() {
           className={`${styles.tabBtn} ${activeTab === 'budgets' ? styles.tabBtnActive : ''}`}
           onClick={() => setActiveTab('budgets')}
         >
-          <PiggyBank size={17} />
+          <PiggyBank size={15} />
           <span>Budgets ({budgets.length})</span>
         </button>
         <button
@@ -263,14 +267,14 @@ export default function MoneyPage() {
           className={`${styles.tabBtn} ${activeTab === 'planning' ? styles.tabBtnActive : ''}`}
           onClick={() => setActiveTab('planning')}
         >
-          <Calendar size={17} />
+          <Calendar size={15} />
           <span>Planning & Forecast</span>
         </button>
       </div>
 
       {/* Tab 1: Overview */}
       {activeTab === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           {/* Net worth card */}
           <NetWorthCard
             totalAssets={netWorthData.totalAssets}
@@ -282,7 +286,7 @@ export default function MoneyPage() {
           <div>
             <div className={styles.sectionTitle}>
               <span>Accounts</span>
-              <span className={styles.sectionCount}>{accounts.length}</span>
+              <Badge variant="default" size="sm">{accounts.length}</Badge>
             </div>
             <div className={styles.grid}>
               {accounts.map(acc => (
@@ -296,7 +300,7 @@ export default function MoneyPage() {
             <div>
               <div className={styles.sectionTitle}>
                 <span>Active Budgets</span>
-                <span className={styles.sectionCount}>{budgets.length}</span>
+                <Badge variant="default" size="sm">{budgets.length}</Badge>
               </div>
               <div className={styles.grid}>
                 {budgets.slice(0, 4).map(b => (
@@ -311,11 +315,11 @@ export default function MoneyPage() {
             <div className={styles.sectionTitle}>
               <span>Recent Transactions</span>
               <button
-                className="btn btn-ghost"
+                className={styles.viewAllBtn}
                 onClick={() => setActiveTab('transactions')}
-                style={{ fontSize: '0.85rem' }}
               >
-                View all →
+                <span>View all</span>
+                <ArrowRight size={13} />
               </button>
             </div>
             <TransactionTable
@@ -344,15 +348,15 @@ export default function MoneyPage() {
       {/* Tab 3: Accounts */}
       {activeTab === 'accounts' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-            <button
-              className="btn btn-primary"
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-3)' }}>
+            <Button
+              variant="primary"
               onClick={() => setShowAddAccountModal(true)}
               id="btn-add-account-tab"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               <span>Add Account</span>
-            </button>
+            </Button>
           </div>
           <div className={styles.grid}>
             {accounts.map(acc => (
@@ -365,18 +369,18 @@ export default function MoneyPage() {
       {/* Tab 4: Budgets */}
       {activeTab === 'budgets' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-            <button
-              className="btn btn-primary"
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-3)' }}>
+            <Button
+              variant="primary"
               onClick={() => setShowAddBudgetModal(true)}
               id="btn-add-budget-tab"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               <span>Add Budget</span>
-            </button>
+            </Button>
           </div>
           {budgets.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>
               <p>No budgets configured yet. Create a budget to track spending limits!</p>
             </div>
           ) : (
@@ -401,231 +405,215 @@ export default function MoneyPage() {
       <QuickExpense onSuccess={loadData} />
 
       {/* Transfer Modal */}
-      {showTransferModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowTransferModal(false)}>
-          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-            <TransferForm
-              accounts={accounts}
-              onSuccess={() => {
-                setShowTransferModal(false);
-                loadData();
-              }}
-              onCancel={() => setShowTransferModal(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={showTransferModal}
+        onClose={() => setShowTransferModal(false)}
+        title="Account Transfer"
+        description="Transfer funds between two of your accounts."
+      >
+        <TransferForm
+          accounts={accounts}
+          onSuccess={() => {
+            setShowTransferModal(false);
+            loadData();
+          }}
+          onCancel={() => setShowTransferModal(false)}
+        />
+      </Modal>
 
       {/* Add Account Modal */}
-      {showAddAccountModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowAddAccountModal(false)}>
-          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-            <form
-              onSubmit={handleCreateAccount}
-              style={{
-                background: 'var(--bg-card)',
-                padding: 24,
-                borderRadius: 16,
-                border: '1px solid var(--border-default)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
+      <Modal
+        isOpen={showAddAccountModal}
+        onClose={() => setShowAddAccountModal(false)}
+        title="Create New Account"
+        description="Add a bank account, credit card, cash wallet, or loan."
+        footer={
+          <div className={styles.modalFooter}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowAddAccountModal(false)}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>New Account</h3>
-                <button
-                  type="button"
-                  className="btn btn-icon btn-ghost"
-                  onClick={() => setShowAddAccountModal(false)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Account Name
-                </label>
-                <input
-                  id="input-new-account-name"
-                  type="text"
-                  placeholder="e.g. HDFC Salary, Cash in Wallet"
-                  value={newAccName}
-                  onChange={e => setNewAccName(e.target.value)}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Institution (Optional)
-                </label>
-                <input
-                  id="input-new-account-institution"
-                  type="text"
-                  placeholder="e.g. HDFC Bank, ICICI"
-                  value={newAccInstitution}
-                  onChange={e => setNewAccInstitution(e.target.value)}
-                  className="input"
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Account Type
-                </label>
-                <select
-                  id="select-new-account-type"
-                  value={newAccType}
-                  onChange={e => setNewAccType(e.target.value as AccountType)}
-                  className="input"
-                >
-                  <option value="bank">Bank Account</option>
-                  <option value="cash">Cash</option>
-                  <option value="credit_card">Credit Card</option>
-                  <option value="investment">Investment</option>
-                  <option value="loan">Loan</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Opening Balance (₹)
-                </label>
-                <input
-                  id="input-new-account-balance"
-                  type="number"
-                  step="any"
-                  placeholder="0.00"
-                  value={newAccBalance}
-                  onChange={e => setNewAccBalance(e.target.value)}
-                  className="input"
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowAddAccountModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" id="btn-submit-new-account">
-                  Create Account
-                </button>
-              </div>
-            </form>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateAccount}
+              id="btn-submit-new-account"
+              disabled={!newAccName.trim()}
+            >
+              Create Account
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form onSubmit={handleCreateAccount} className={styles.modalForm}>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="input-new-account-name">
+              Account Name <span className={styles.requiredStar}>*</span>
+            </label>
+            <input
+              id="input-new-account-name"
+              type="text"
+              placeholder="e.g. HDFC Salary, ICICI Savings, Cash Wallet"
+              value={newAccName}
+              onChange={e => setNewAccName(e.target.value)}
+              className={styles.formInput}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="input-new-account-institution">
+              Institution (Optional)
+            </label>
+            <input
+              id="input-new-account-institution"
+              type="text"
+              placeholder="e.g. HDFC Bank, SBI, Zerodha"
+              value={newAccInstitution}
+              onChange={e => setNewAccInstitution(e.target.value)}
+              className={styles.formInput}
+            />
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="select-new-account-type">
+                Account Type
+              </label>
+              <select
+                id="select-new-account-type"
+                value={newAccType}
+                onChange={e => setNewAccType(e.target.value as AccountType)}
+                className={styles.formSelect}
+              >
+                <option value="bank">Bank Account</option>
+                <option value="cash">Cash</option>
+                <option value="credit_card">Credit Card</option>
+                <option value="investment">Investment</option>
+                <option value="loan">Loan</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="input-new-account-balance">
+                Opening Balance (₹)
+              </label>
+              <input
+                id="input-new-account-balance"
+                type="number"
+                step="any"
+                placeholder="0.00"
+                value={newAccBalance}
+                onChange={e => setNewAccBalance(e.target.value)}
+                className={styles.formInput}
+              />
+            </div>
+          </div>
+        </form>
+      </Modal>
 
       {/* Add Budget Modal */}
-      {showAddBudgetModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowAddBudgetModal(false)}>
-          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
-            <form
-              onSubmit={handleCreateBudget}
-              style={{
-                background: 'var(--bg-card)',
-                padding: 24,
-                borderRadius: 16,
-                border: '1px solid var(--border-default)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 16,
-              }}
+      <Modal
+        isOpen={showAddBudgetModal}
+        onClose={() => setShowAddBudgetModal(false)}
+        title="New Budget"
+        description="Establish a disciplined spending ceiling for categories or initiatives."
+        footer={
+          <div className={styles.modalFooter}>
+            <Button
+              variant="secondary"
+              onClick={() => setShowAddBudgetModal(false)}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>New Budget</h3>
-                <button
-                  type="button"
-                  className="btn btn-icon btn-ghost"
-                  onClick={() => setShowAddBudgetModal(false)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Budget Name
-                </label>
-                <input
-                  id="input-new-budget-name"
-                  type="text"
-                  placeholder="e.g. Monthly Dining, Groceries"
-                  value={newBudgetName}
-                  onChange={e => setNewBudgetName(e.target.value)}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Spending Limit (₹)
-                </label>
-                <input
-                  id="input-new-budget-target"
-                  type="number"
-                  step="any"
-                  placeholder="10000"
-                  value={newBudgetTarget}
-                  onChange={e => setNewBudgetTarget(e.target.value)}
-                  className="input"
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Period
-                </label>
-                <select
-                  id="select-new-budget-period"
-                  value={newBudgetPeriod}
-                  onChange={e => setNewBudgetPeriod(e.target.value as BudgetPeriod)}
-                  className="input"
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                  Category (Optional)
-                </label>
-                <CategorySelect
-                  id="select-new-budget-category"
-                  direction="expense"
-                  value={newBudgetCategory}
-                  onChange={setNewBudgetCategory}
-                  placeholder="Applies to all categories"
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowAddBudgetModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" id="btn-submit-new-budget">
-                  Save Budget
-                </button>
-              </div>
-            </form>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateBudget}
+              id="btn-submit-new-budget"
+              disabled={!newBudgetName.trim() || !newBudgetTarget}
+            >
+              Save Budget
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form onSubmit={handleCreateBudget} className={styles.modalForm}>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="input-new-budget-name">
+              Budget Name <span className={styles.requiredStar}>*</span>
+            </label>
+            <input
+              id="input-new-budget-name"
+              type="text"
+              placeholder="e.g. Dining Out, Monthly Groceries, Fuel"
+              value={newBudgetName}
+              onChange={e => setNewBudgetName(e.target.value)}
+              className={styles.formInput}
+              required
+              autoFocus
+            />
+          </div>
+
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="input-new-budget-target">
+                Spending Limit (₹) <span className={styles.requiredStar}>*</span>
+              </label>
+              <input
+                id="input-new-budget-target"
+                type="number"
+                step="any"
+                placeholder="10000"
+                value={newBudgetTarget}
+                onChange={e => setNewBudgetTarget(e.target.value)}
+                className={styles.formInput}
+                required
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="select-new-budget-period">
+                Cycle Period
+              </label>
+              <select
+                id="select-new-budget-period"
+                value={newBudgetPeriod}
+                onChange={e => setNewBudgetPeriod(e.target.value as BudgetPeriod)}
+                className={styles.formSelect}
+              >
+                <option value="monthly">Monthly</option>
+                <option value="weekly">Weekly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          </div>
+
+          {newBudgetPeriod !== 'monthly' && (
+            <div className={styles.gapNotice}>
+              <span>
+                Note: Calculation engine actively evaluates against monthly transaction cycles.
+                Multi-period custom cycles will automatically activate in Phase 5.
+              </span>
+            </div>
+          )}
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="select-new-budget-category">
+              Category Scope (Optional)
+            </label>
+            <CategorySelect
+              id="select-new-budget-category"
+              direction="expense"
+              value={newBudgetCategory}
+              onChange={setNewBudgetCategory}
+              placeholder="Applies to all categories"
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

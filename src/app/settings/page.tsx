@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
   Moon, Sun, Cloud, RefreshCw,
   Download, Upload, ChevronRight, LogOut, Trash2,
-  Package, ShieldCheck, CheckCircle2, AlertCircle, Settings2,
+  Package, CheckCircle2, AlertCircle, Settings2,
+  Lock, Zap, Plug,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -14,6 +15,7 @@ import { useToast } from '@/components/providers/ToastProvider';
 import { dataService } from '@/lib/services/DataService';
 import { storageModeService } from '@/lib/services/StorageModeService';
 import { StorageMode } from '@/types';
+import { Button, Badge } from '@/components/ui';
 import styles from './page.module.css';
 
 export default function SettingsPage() {
@@ -58,8 +60,6 @@ export default function SettingsPage() {
   function handleSelectStorage(target: StorageMode) {
     if (target === storageMode) return;
     if (target === 'custom_supabase' && !userConfig) {
-      // Never configured before — the setup wizard tests the connection and
-      // sets the mode itself once it succeeds, so there's nothing to switch yet.
       router.push('/auth/setup');
       return;
     }
@@ -168,366 +168,366 @@ export default function SettingsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Settings</h1>
+        <p className={styles.subtitle}>System preferences, data storage, sync controls, and privacy.</p>
       </div>
 
-      {/* Account */}
-      {user && (
-        <section className={styles.section}>
-          <div className="section-header">
-            <span className="section-title">Account</span>
-          </div>
-          <div className={styles.card}>
-            <div className={styles.accountRow}>
-              <div className={styles.avatar}>
-                {user.user_metadata?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.user_metadata.avatar_url} alt="Avatar" className={styles.avatarImg} />
-                ) : (
-                  <span className={styles.avatarInitial}>{user.email?.[0]?.toUpperCase() ?? 'U'}</span>
-                )}
-              </div>
-              <div className={styles.accountInfo}>
-                <span className={styles.accountName}>
-                  {user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'User'}
-                </span>
-                <span className={styles.accountEmail}>{user.email}</span>
+      <div className={styles.sectionsList}>
+        {/* 1. Account */}
+        {user && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionHeading}>Account</h2>
+            <div className={styles.panel}>
+              <div className={styles.accountRow}>
+                <div className={styles.avatar}>
+                  {user.user_metadata?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.user_metadata.avatar_url} alt="Avatar" className={styles.avatarImg} />
+                  ) : (
+                    <span className={styles.avatarInitial}>{user.email?.[0]?.toUpperCase() ?? 'U'}</span>
+                  )}
+                </div>
+                <div className={styles.accountInfo}>
+                  <span className={styles.accountName}>
+                    {user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'User'}
+                  </span>
+                  <span className={styles.accountEmail}>{user.email}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={signOut}
+                  id="btn-sign-out"
+                  className={styles.signOutBtn}
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
+                </Button>
               </div>
             </div>
-            <div className={styles.accountDivider} />
+          </section>
+        )}
+
+        {/* 2. Appearance */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Appearance</h2>
+          <div className={styles.panel}>
+            <div className={styles.settingRow}>
+              <div className={styles.settingInfo}>
+                {theme === 'dark' ? (
+                  <Moon size={16} className={styles.settingIcon} />
+                ) : (
+                  <Sun size={16} className={styles.settingIcon} />
+                )}
+                <div>
+                  <span className={styles.settingLabel}>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
+                  <span className={styles.settingSubtitle}>Switch between calm dark and high-contrast light aesthetics</span>
+                </div>
+              </div>
+              <button
+                id="btn-toggle-theme"
+                className={styles.toggle}
+                data-active={theme === 'dark'}
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+              >
+                <span className={styles.toggleThumb} />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Storage */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Storage</h2>
+          <div className={styles.panel}>
+            {needsMigrationChoice && (
+              <div className={styles.noticeBox} role="alert">
+                <p className={styles.noticeTitle}>
+                  We found data stored in your connected Supabase database.
+                </p>
+                <p className={styles.noticeText}>
+                  Choose where TRACKR should store your future data.
+                </p>
+                <div className={styles.noticeActions}>
+                  <Button variant="secondary" size="sm" onClick={() => resolveMigrationChoice('custom_supabase')} id="btn-migration-keep-custom">
+                    Continue with my Supabase
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={() => resolveMigrationChoice('trackr_cloud')} id="btn-migration-move-cloud">
+                    Move to TRACKR Cloud
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {switchTarget && (
+              <div className={styles.dangerNoticeBox} role="alertdialog" aria-label="Confirm storage change">
+                <p className={styles.noticeTitle}>
+                  Switch to {switchTarget === 'trackr_cloud' ? 'TRACKR Cloud' : 'my own Supabase'}?
+                </p>
+                <p className={styles.noticeText}>
+                  Future data will be saved there instead. Your existing data isn&apos;t moved automatically.
+                </p>
+                <div className={styles.noticeActions}>
+                  <Button variant="primary" size="sm" onClick={() => confirmSwitch(true)} id="btn-switch-move-data">
+                    Move my existing data
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => confirmSwitch(false)} id="btn-switch-keep-data">
+                    Keep existing data where it is
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSwitchTarget(null)} id="btn-switch-cancel">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {migrating && (
+              <div className={styles.statusRow}>
+                <RefreshCw size={13} className={styles.spinIcon} />
+                <span>Moving your data to active provider…</span>
+              </div>
+            )}
+            {migrationDone && !migrating && (
+              <div className={`${styles.statusRow} ${styles.statusSuccess}`}>
+                <CheckCircle2 size={13} />
+                <span>Your existing data has been queued to move — it will finish syncing shortly.</span>
+              </div>
+            )}
+
+            <div className={styles.radioList}>
+              <label
+                className={`${styles.radioCard} ${storageMode === 'trackr_cloud' ? styles.radioCardActive : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="storage-mode"
+                  checked={storageMode === 'trackr_cloud'}
+                  onChange={() => handleSelectStorage('trackr_cloud')}
+                  id="radio-storage-trackr-cloud"
+                  className={styles.radioInput}
+                />
+                <div className={styles.radioContent}>
+                  <div className={styles.radioHeader}>
+                    <div className={styles.radioTitleRow}>
+                      <Cloud size={14} className={styles.radioIcon} />
+                      <span className={styles.radioTitle}>TRACKR Cloud</span>
+                    </div>
+                    <Badge variant="success" size="sm">Recommended</Badge>
+                  </div>
+                  <span className={styles.radioSubtitle}>
+                    Encrypted and isolated per user with Supabase Row-Level Security. Zero setup required.
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={`${styles.radioCard} ${storageMode === 'custom_supabase' ? styles.radioCardActive : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="storage-mode"
+                  checked={storageMode === 'custom_supabase'}
+                  onChange={() => handleSelectStorage('custom_supabase')}
+                  id="radio-storage-custom"
+                  className={styles.radioInput}
+                />
+                <div className={styles.radioContent}>
+                  <div className={styles.radioHeader}>
+                    <div className={styles.radioTitleRow}>
+                      <Settings2 size={14} className={styles.radioIcon} />
+                      <span className={styles.radioTitle}>Custom Supabase (BYODB)</span>
+                    </div>
+                    <Badge variant="default" size="sm">Advanced</Badge>
+                  </div>
+                  <span className={styles.radioSubtitle}>
+                    {userConfig
+                      ? `Connected to your project (${userConfig.supabase_url.replace('https://', '').split('.supabase')[0]}.supabase.co)`
+                      : 'Connect your own dedicated Supabase database project.'}
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {storageMode === 'custom_supabase' && (
+              <div className={styles.panelFooter}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => router.push('/auth/setup')}
+                  id="btn-manage-custom-storage"
+                >
+                  <RefreshCw size={13} />
+                  <span>{userConfig ? 'Reconfigure Supabase Project' : 'Connect Supabase Project'}</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 4. Sync & Status */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Sync</h2>
+          <div className={styles.panel}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoIconWrap}>
+                <Zap size={15} className={styles.infoIcon} />
+              </div>
+              <div className={styles.infoBody}>
+                <span className={styles.infoTitle}>Deterministic Offline-First Sync</span>
+                <span className={styles.infoText}>
+                  All changes are immediately committed to your local IndexedDB storage. Sync operations are queued and replay deterministically whenever network connectivity is verified.
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 5. Privacy & Security */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Privacy & Security</h2>
+          <div className={styles.panel}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoIconWrap}>
+                <Lock size={15} className={styles.infoIcon} />
+              </div>
+              <div className={styles.infoBody}>
+                <span className={styles.infoTitle}>Zero Telemetry & Private by Design</span>
+                <span className={styles.infoText}>
+                  TRACKR does not run external AI scraping, behavioral telemetry, or third-party ad networks. Your financial transactions, notes, habits, and tasks remain strictly private to your device and authorized database.
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 6. Data Management */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Data Management</h2>
+          <div className={styles.panel}>
+            {/* Export */}
+            <button className={styles.actionRow} onClick={handleExport} id="btn-export-data">
+              <Download size={16} className={styles.settingIcon} />
+              <div className={styles.actionRowInfo}>
+                <span className={styles.settingLabel}>Export Full Backup</span>
+                <span className={styles.settingSubtitle}>Download all items, relations, context links, and history as JSON</span>
+              </div>
+              <ChevronRight size={14} className={styles.chevron} />
+            </button>
+
+            <div className={styles.divider} />
+
+            {/* Import */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileImport}
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+            />
             <button
-              className={styles.signOutBtn}
-              onClick={signOut}
-              id="btn-sign-out"
+              className={styles.actionRow}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              id="btn-import-data"
             >
-              <LogOut size={16} />
-              Sign Out
+              <Upload size={16} className={styles.settingIcon} />
+              <div className={styles.actionRowInfo}>
+                <span className={styles.settingLabel}>
+                  {importing ? 'Importing…' : 'Import Data Backup'}
+                </span>
+                <span className={styles.settingSubtitle}>
+                  Restore from a verified TRACKR JSON backup file
+                </span>
+              </div>
+              <ChevronRight size={14} className={styles.chevron} />
+            </button>
+
+            {importFeedback && (
+              <div
+                className={`${styles.feedbackBox} ${
+                  importFeedback.success ? styles.feedbackSuccess : styles.feedbackError
+                }`}
+              >
+                {importFeedback.success ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+                <span>{importFeedback.message}</span>
+              </div>
+            )}
+
+            <div className={styles.divider} />
+
+            {/* Load Sample Data */}
+            <button
+              className={styles.actionRow}
+              onClick={handleLoadSample}
+              disabled={sampleLoading}
+              id="btn-load-sample-data"
+            >
+              <Package size={16} className={styles.settingIcon} />
+              <div className={styles.actionRowInfo}>
+                <span className={styles.settingLabel}>
+                  {sampleLoading ? 'Loading…' : 'Load Sample Project & Data'}
+                </span>
+                <span className={styles.settingSubtitle}>
+                  Explore the &quot;YouTube Channel&quot; demonstration with connected tasks, notes, expenses & graph
+                </span>
+              </div>
+              <ChevronRight size={14} className={styles.chevron} />
             </button>
           </div>
         </section>
-      )}
 
-      {/* Storage */}
-      <section className={styles.section}>
-        <div className="section-header">
-          <span className="section-title">Storage</span>
-        </div>
-        <div className={styles.card} style={{ padding: '16px' }}>
-          {needsMigrationChoice && (
-            <div
-              role="alert"
-              style={{
-                marginBottom: 14, padding: '12px 14px', borderRadius: 10,
-                background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)',
-              }}
-            >
-              <p style={{ margin: '0 0 4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                We found data stored in your connected Supabase database.
-              </p>
-              <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Choose where TRACKR should store your future data.
-              </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => resolveMigrationChoice('custom_supabase')} id="btn-migration-keep-custom">
-                  Continue with my Supabase
-                </button>
-                <button className="btn btn-primary btn-sm" onClick={() => resolveMigrationChoice('trackr_cloud')} id="btn-migration-move-cloud">
-                  Move to TRACKR Cloud
-                </button>
-              </div>
-            </div>
-          )}
-
-          {switchTarget && (
-            <div
-              role="alertdialog"
-              aria-label="Confirm storage change"
-              style={{
-                marginBottom: 14, padding: '12px 14px', borderRadius: 10,
-                background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)',
-              }}
-              onKeyDown={e => { if (e.key === 'Escape') setSwitchTarget(null); }}
-            >
-              <p style={{ margin: '0 0 4px', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Switch to {switchTarget === 'trackr_cloud' ? 'TRACKR Cloud' : 'my own Supabase'}?
-              </p>
-              <p style={{ margin: '0 0 10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Future data will be saved there instead. Your existing data isn&apos;t moved automatically.
-              </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary btn-sm" onClick={() => confirmSwitch(true)} id="btn-switch-move-data">
-                  Move my existing data
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => confirmSwitch(false)} id="btn-switch-keep-data">
-                  Keep existing data where it is
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={() => setSwitchTarget(null)} id="btn-switch-cancel">
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {migrating && (
-            <div style={{ marginBottom: 14, fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <RefreshCw size={14} /> Moving your data…
-            </div>
-          )}
-          {migrationDone && !migrating && (
-            <div style={{ marginBottom: 14, fontSize: '0.8rem', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <CheckCircle2 size={14} /> Your existing data has been queued to move — it&apos;ll finish syncing shortly.
-            </div>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label
-              style={{
-                display: 'flex', gap: 10, padding: '12px', borderRadius: 10, cursor: 'pointer',
-                border: `1px solid ${storageMode === 'trackr_cloud' ? 'var(--accent-primary, #6366f1)' : 'var(--border-subtle)'}`,
-              }}
-            >
-              <input
-                type="radio"
-                name="storage-mode"
-                checked={storageMode === 'trackr_cloud'}
-                onChange={() => handleSelectStorage('trackr_cloud')}
-                id="radio-storage-trackr-cloud"
-                style={{ marginTop: 3 }}
-              />
-              <span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <Cloud size={15} /> TRACKR Cloud
-                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-success)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Recommended
-                  </span>
-                </span>
-                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                  Your data is securely stored in your TRACKR account. No setup required.
-                </span>
-              </span>
-            </label>
-
-            <label
-              style={{
-                display: 'flex', gap: 10, padding: '12px', borderRadius: 10, cursor: 'pointer',
-                border: `1px solid ${storageMode === 'custom_supabase' ? 'var(--accent-primary, #6366f1)' : 'var(--border-subtle)'}`,
-              }}
-            >
-              <input
-                type="radio"
-                name="storage-mode"
-                checked={storageMode === 'custom_supabase'}
-                onChange={() => handleSelectStorage('custom_supabase')}
-                id="radio-storage-custom"
-                style={{ marginTop: 3 }}
-              />
-              <span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                  <Settings2 size={15} /> My own Supabase
-                  <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                    Advanced
-                  </span>
-                </span>
-                <span style={{ display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                  {userConfig
-                    ? `Store your TRACKR data in a Supabase project you control (${userConfig.supabase_url.replace('https://', '').split('.supabase')[0]}.supabase.co).`
-                    : 'Store your TRACKR data in a Supabase project you control.'}
-                </span>
-              </span>
-            </label>
+        {/* 7. Integrations (Planned) */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeadingRow}>
+            <h2 className={styles.sectionHeading}>Integrations</h2>
+            <Badge variant="default" size="sm">Phase 5+</Badge>
           </div>
-
-          {storageMode === 'custom_supabase' && (
-            <button
-              className="btn btn-secondary btn-sm"
-              style={{ marginTop: 10 }}
-              onClick={() => router.push('/auth/setup')}
-              id="btn-manage-custom-storage"
-            >
-              <RefreshCw size={14} /> {userConfig ? 'Change my Supabase project' : 'Connect my Supabase project'}
-            </button>
-          )}
-        </div>
-      </section>
-
-      {/* Appearance */}
-      <section className={styles.section}>
-        <div className="section-header">
-          <span className="section-title">Appearance</span>
-        </div>
-        <div className={styles.card}>
-          <div className={styles.settingRow}>
-            <div className={styles.settingInfo}>
-              {theme === 'dark'
-                ? <Moon size={18} className={styles.settingIcon} />
-                : <Sun size={18} className={styles.settingIcon} />
-              }
-              <div>
-                <span className={styles.settingLabel}>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
-                <span className={styles.settingSubtitle}>Toggle app theme</span>
+          <div className={styles.panel}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoIconWrap}>
+                <Plug size={15} className={styles.infoIcon} />
+              </div>
+              <div className={styles.infoBody}>
+                <span className={styles.infoTitle}>Deterministic Email & Financial Connectors</span>
+                <span className={styles.infoText}>
+                  Bank connections, broker sync, and Financial Inbox rules are scheduled for future phases. Core personal operating system features remain fully local.
+                </span>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* 8. Danger Zone */}
+        <section className={styles.section}>
+          <h2 className={`${styles.sectionHeading} ${styles.dangerHeading}`}>Danger Zone</h2>
+          <div className={`${styles.panel} ${styles.dangerPanel}`}>
             <button
-              id="btn-toggle-theme"
-              className={styles.toggle}
-              data-active={theme === 'dark'}
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
+              className={styles.actionRow}
+              onClick={handleClearAllData}
+              disabled={clearing}
+              id="btn-clear-all-data"
             >
-              <span className={styles.toggleThumb} />
+              <Trash2 size={16} className={styles.dangerIcon} />
+              <div className={styles.actionRowInfo}>
+                <span className={`${styles.settingLabel} ${styles.dangerLabel}`}>
+                  {clearing ? 'Clearing Data…' : 'Clear All Data'}
+                </span>
+                <span className={styles.settingSubtitle}>
+                  Permanently wipe all items, tasks, transactions, and graph links from local storage and remote database
+                </span>
+              </div>
+              <ChevronRight size={14} className={styles.chevron} />
             </button>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Data management */}
-      <section className={styles.section}>
-        <div className="section-header">
-          <span className="section-title">Data Management</span>
-        </div>
-        <div className={styles.card}>
-          {/* Export */}
-          <button className={styles.actionRow} onClick={handleExport} id="btn-export-data">
-            <Download size={18} className={styles.settingIcon} />
-            <div className={styles.settingInfo2}>
-              <span className={styles.settingLabel}>Export Full Backup</span>
-              <span className={styles.settingSubtitle}>Download all items, relations, and history as JSON</span>
-            </div>
-            <ChevronRight size={16} className={styles.chevron} />
-          </button>
-
-          <div style={{ height: 1, background: 'var(--border-subtle)', margin: '0 16px' }} />
-
-          {/* Import */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileImport}
-            accept=".json,application/json"
-            style={{ display: 'none' }}
-          />
-          <button
-            className={styles.actionRow}
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importing}
-            id="btn-import-data"
-          >
-            <Upload size={18} className={styles.settingIcon} />
-            <div className={styles.settingInfo2}>
-              <span className={styles.settingLabel}>
-                {importing ? 'Importing…' : 'Import Data Backup'}
-              </span>
-              <span className={styles.settingSubtitle}>
-                Restore from a validated TRACKR JSON export file
-              </span>
-            </div>
-            <ChevronRight size={16} className={styles.chevron} />
-          </button>
-
-          {importFeedback && (
-            <div
-              style={{
-                margin: '8px 16px 14px 16px',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.8rem',
-                backgroundColor: importFeedback.success
-                  ? 'rgba(16, 185, 129, 0.1)'
-                  : 'rgba(239, 68, 68, 0.1)',
-                color: importFeedback.success
-                  ? 'var(--color-success, #10b981)'
-                  : 'var(--color-danger, #ef4444)',
-                border: `1px solid ${
-                  importFeedback.success
-                    ? 'rgba(16, 185, 129, 0.25)'
-                    : 'rgba(239, 68, 68, 0.25)'
-                }`,
-              }}
-            >
-              {importFeedback.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-              <span>{importFeedback.message}</span>
-            </div>
-          )}
-
-          <div style={{ height: 1, background: 'var(--border-subtle)', margin: '0 16px' }} />
-
-          {/* Load Sample Data */}
-          <button
-            className={styles.actionRow}
-            onClick={handleLoadSample}
-            disabled={sampleLoading}
-            id="btn-load-sample-data"
-          >
-            <Package size={18} className={styles.settingIcon} />
-            <div className={styles.settingInfo2}>
-              <span className={styles.settingLabel}>
-                {sampleLoading ? 'Loading…' : 'Load Sample Project & Data'}
-              </span>
-              <span className={styles.settingSubtitle}>
-                Load the interconnected &quot;YouTube Channel&quot; demo with tasks, notes, expenses & backlinks
-              </span>
-            </div>
-            <ChevronRight size={16} className={styles.chevron} />
-          </button>
-
-          <div style={{ height: 1, background: 'var(--border-subtle)', margin: '0 16px' }} />
-
-          {/* Clear All */}
-          <button
-            className={styles.actionRow}
-            onClick={handleClearAllData}
-            disabled={clearing}
-            id="btn-clear-all-data"
-            style={{ color: 'var(--color-danger)' }}
-          >
-            <Trash2 size={18} className={styles.settingIcon} style={{ color: 'var(--color-danger)' }} />
-            <div className={styles.settingInfo2}>
-              <span className={styles.settingLabel} style={{ color: 'var(--color-danger)' }}>
-                {clearing ? 'Clearing Data…' : 'Clear All Data'}
-              </span>
-              <span className={styles.settingSubtitle}>
-                Wipe all demo & created items from local storage and your cloud storage
-              </span>
-            </div>
-            <ChevronRight size={16} className={styles.chevron} />
-          </button>
-        </div>
-      </section>
-
-      {/* Privacy & Architecture */}
-      <section className={styles.section}>
-        <div className="section-header">
-          <span className="section-title">Privacy & Architecture</span>
-        </div>
-        <div className={styles.card} style={{ padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <ShieldCheck size={20} color="var(--primary, #6366f1)" />
-            <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-              100% Local-First & Private
-            </strong>
-          </div>
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.5', margin: 0 }}>
-            TRACKR runs deterministically in your browser using IndexedDB — no external AI APIs, no
-            vector databases, and no hidden tracking. Every action saves locally first, then syncs in
-            the background to your chosen storage: TRACKR Cloud (isolated to your account by
-            row-level security) by default, or your own Supabase project if you connect one.
-          </p>
-        </div>
-      </section>
-
-      {/* About */}
-      <section className={styles.section}>
-        <div className={styles.about}>
-          <div className={styles.logo}>T</div>
+        {/* About */}
+        <section className={styles.aboutSection}>
           <span className={styles.appName}>TRACKR</span>
-          <span className={styles.tagline}>Write it. Track it. Link it. Understand it.</span>
-          <span className={styles.version}>v1.0.0 · Local-first + Supabase sync</span>
-        </div>
-      </section>
-
-      <div style={{ height: 32 }} />
+          <span className={styles.tagline}>Connected Personal Operating System</span>
+          <span className={styles.version}>v1.0.0 · Local-first architecture</span>
+        </section>
+      </div>
     </div>
   );
 }
