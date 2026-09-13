@@ -6,7 +6,7 @@ import { Bell, CheckCircle2, CircleAlert, ChevronDown, Flame, LogOut, Menu, Refr
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { dataService } from '@/lib/services/DataService';
-import { BudgetProgress, InAppNotification, TaskMetadata } from '@/types';
+import { FinanceBudgetProgress, InAppNotification, TaskMetadata } from '@/types';
 import styles from './AppHeader.module.css';
 
 type SyncDot = 'synced' | 'syncing' | 'pending' | 'failed' | 'offline' | 'idle' | 'needs_attention';
@@ -22,7 +22,7 @@ export function AppHeader() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncDot>('idle');
   const [pendingCount, setPendingCount] = useState(0);
-  const [budgetAlerts, setBudgetAlerts] = useState<BudgetProgress[]>([]);
+  const [budgetAlerts, setBudgetAlerts] = useState<FinanceBudgetProgress[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // All hooks run before the authentication/page early return so their order
@@ -74,7 +74,7 @@ export function AppHeader() {
       id: `budget-${progress.budget.id}`,
       kind: 'budget_alert' as const,
       title: `${Math.round(progress.percentage)}% of budget used`,
-      description: `${progress.budget.metadata.category} has reached ${Math.round(progress.percentage)}% this month.`,
+      description: `${progress.categoryName || progress.budget.name} has reached ${Math.round(progress.percentage)}% this month.`,
       href: '/money',
     }));
     const milestone = dailyStreak && dailyStreak.milestoneReachedOn === dailyStreak.lastOpenedDate && dailyStreak.milestoneReached

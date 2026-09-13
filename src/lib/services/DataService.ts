@@ -4,11 +4,17 @@ import {
   saveRelation, getRecentActivity,
   saveActivityEvent, searchItems, getSetting, setSetting, getAllRelations,
   deleteItem as localDeleteItem, deleteRelationsForItem, clearAllData as localClearAllData,
-  deleteRelation, deleteRelationByPair, getAllActivityEvents, getAllSyncOps
+  deleteRelation, deleteRelationByPair, getAllActivityEvents, getAllSyncOps,
+  searchFinanceTransactions,
 } from '@/lib/db/localDb';
+import {
+  financeTransactionService,
+  financeBudgetService,
+  financeReportService,
+} from '@/lib/services/finance';
 import { buildRelationsFromText } from './ReferenceParser';
 import {
-  BudgetItem, BudgetMetadata, BudgetProgress, DailyStreakState, Item, ItemType,
+  DailyStreakState, Item, ItemType,
   ItemRelation, ActivityEvent, ActivityEventType, TransactionCategory,
   TransactionMetadata, WeeklyDigestSummary, ProjectContextSummary,
   InboxMetadata, SyncStatus, RelationType, TaskMetadata, TaskRecurrence,
@@ -822,88 +828,70 @@ class DataService {
     return all.filter(i => i.title.toLowerCase().includes(q)).slice(0, 10);
   }
 
-  // ── Finance helpers ────────────────────────────────────────────────────
+  // ── Finance helpers (legacy delegation to FinanceService) ─────────────────
 
-  async getTransactionsThisMonth(): Promise<Item[]> {
-    const expenses = await getItemsByType('expense');
-    const income = await getItemsByType('income');
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    return [...expenses, ...income].filter(item => {
-      const meta = item.metadata as { date?: string };
-      return meta.date && meta.date >= monthStart;
-    });
+  /** @deprecated Use financeTransactionService.getTransactionsThisMonth() */
+  async getTransactionsThisMonth() {
+    return financeTransactionService.getTransactionsThisMonth();
   }
 
+  /** @deprecated Use financeTransactionService.getMonthlyTotals() */
   async getMonthlyTotals(): Promise<{ income: number; expenses: number; net: number }> {
-    const txns = await this.getTransactionsThisMonth();
-    let income = 0;
-    let expenses = 0;
-    for (const txn of txns) {
-      const meta = txn.metadata as { amount: number; isIncome: boolean };
-      if (meta.isIncome) income += meta.amount ?? 0;
-      else expenses += meta.amount ?? 0;
-    }
-    return { income, expenses, net: income - expenses };
+    return financeTransactionService.getMonthlyTotals();
   }
 
-  async getMonthlyBudgetProgress(): Promise<BudgetProgress[]> {
-    const [budgetItems, transactions] = await Promise.all([
-      getItemsByType('budget'),
-      this.getTransactionsThisMonth(),
-    ]);
-    const spendingByCategory = new Map<TransactionCategory, number>();
-
-    for (const transaction of transactions) {
-      const metadata = transaction.metadata as TransactionMetadata;
-      if (!metadata.isIncome) {
-        const category = metadata.category as TransactionCategory;
-        spendingByCategory.set(category, (spendingByCategory.get(category) ?? 0) + metadata.amount);
-      }
-    }
-
-    return budgetItems
-      .map(item => item as BudgetItem)
-      .filter(item => {
-        const metadata = item.metadata as BudgetMetadata;
-        return metadata.period === 'monthly' && Boolean(metadata.category) && metadata.limit > 0;
-      })
-      .map(budget => {
-        const metadata = budget.metadata as BudgetMetadata;
-        const spent = spendingByCategory.get(metadata.category!) ?? 0;
-        const percentage = (spent / metadata.limit) * 100;
-        return { budget, spent, percentage, isAlert: percentage >= 80 };
-      })
-      .sort((a, b) => b.percentage - a.percentage);
+  /** @deprecated Use financeBudgetService.getAllBudgetProgress() */
+  async getMonthlyBudgetProgress() {
+    return financeBudgetService.getAllBudgetProgress();
   }
 
-  async saveMonthlyBudget(category: TransactionCategory, limit: number, currency = 'INR'): Promise<Item | null> {
+
+  /** @deprecated Use financeBudgetService.createBudget() */
+  async saveMonthlyBudget(category: TransactionCategory, limit: number, currency = 'INR') {
     if (!Number.isFinite(limit) || limit <= 0) return null;
-
-    const budgets = await getItemsByType('budget');
-    const existing = budgets.find(item => {
-      const metadata = item.metadata as BudgetMetadata;
-      return metadata.period === 'monthly' && metadata.category === category;
-    });
-    const metadata: BudgetMetadata = {
-      limit,
+    const startDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    return financeBudgetService.createBudget({
+      name: `${category} monthly budget`,
+      target: limit,
       currency,
       period: 'monthly',
-      category,
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10),
+      startDate,
       alertThreshold: 0.8,
-    };
-
-    if (existing) {
-      return this.updateItem(existing.id, { metadata, title: `${category} monthly budget` });
-    }
-
-    return this.createItem({
-      type: 'budget',
-      title: `${category} monthly budget`,
-      content: '',
-      metadata,
     });
+  }
+
+
+  // ── Finance integration: project financial context ─────────────────────────
+
+  async getProjectFinancialSummary(projectId: string) {
+    return financeReportService.getProjectFinancialSummary(projectId);
+  }
+
+  async getGoalFinancialProgress(goalId: string) {
+    return financeReportService.getGoalFinancialProgress(goalId);
+  }
+
+  async getNetWorth() {
+    return financeReportService.getNetWorth();
+  }
+
+  // ── Finance-aware search (extends base search) ─────────────────────────────
+
+  async searchWithFinance(query: string): Promise<{ items: Item[]; transactions: { id: string; payee?: string; amount: number; date: string; type: string }[] }> {
+    const [items, transactions] = await Promise.all([
+      searchItems(query),
+      searchFinanceTransactions(query),
+    ]);
+    return {
+      items,
+      transactions: transactions.map(t => ({
+        id: t.id,
+        payee: t.payee,
+        amount: t.amount,
+        date: t.date,
+        type: t.type,
+      })),
+    };
   }
 
   // ── Tracker helpers ────────────────────────────────────────────────────

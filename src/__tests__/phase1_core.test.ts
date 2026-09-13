@@ -84,14 +84,21 @@ describe('Phase 1 — Core UX & Data Lifecycle Suite', () => {
   // ─── STEP 3, 4, 5: Task Model, Dates & Views ──────────────────────────────
   describe('Task Model, Dates & Views', () => {
     it('supports full lifecycle statuses, priorities, dates, and view aggregations', async () => {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+      // Use local date strings to avoid UTC vs local timezone mismatch.
+      // new Date().toISOString().slice(0, 10) returns UTC date which may differ
+      // from the local date in timezones ahead of UTC (e.g. IST +05:30 at 00:01 local = 18:31 yesterday UTC).
+      function localDateStr(offset = 0): string {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+      const todayStr = localDateStr(0);
+      const tomorrowStr = localDateStr(1);
+      const yesterdayStr = localDateStr(-1);
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
       // Create tasks with different statuses, priorities, and dates
       const taskToday = await dataService.createItem({

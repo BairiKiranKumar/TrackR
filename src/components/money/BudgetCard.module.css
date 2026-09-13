@@ -1,0 +1,117 @@
+.card {
+  background: var(--bg-card, #131317);
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card:hover {
+  background: var(--bg-card-hover, #1a1a21);
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.18));
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary, #f4f4f6);
+}
+
+.subtitle {
+  font-size: 0.8rem;
+  color: var(--text-tertiary, #636375);
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badgeNormal {
+  background: var(--bg-elevated, #202028);
+  color: var(--text-secondary, #9e9ead);
+}
+
+.badgeAlert {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badgeOver {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.progressContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.barTrack {
+  height: 8px;
+  background: var(--bg-secondary, #111114);
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.barFill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fillNormal {
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+}
+
+.fillAlert {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.fillOver {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+}
+
+.statsRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #9e9ead);
+}
+
+.statValue {
+  font-weight: 700;
+  color: var(--text-primary, #f4f4f6);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-tertiary, #636375);
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  padding-top: 10px;
+}

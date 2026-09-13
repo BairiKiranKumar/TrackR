@@ -1,0 +1,85 @@
+.card {
+  background: var(--bg-card, #131317);
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  background: var(--bg-card-hover, #1a1a21);
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.18));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.accountInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary, #f4f4f6);
+}
+
+.institution {
+  font-size: 0.8rem;
+  color: var(--text-tertiary, #636375);
+}
+
+.typeBadge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--bg-elevated, #202028);
+  color: var(--text-secondary, #9e9ead);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.balanceRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.balanceLabel {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #636375);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.balanceValue {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary, #f4f4f6);
+  font-variant-numeric: tabular-nums;
+}
+
+.negative {
+  color: var(--color-danger, #ef4444);
+}
+
+.positive {
+  color: var(--color-success, #10b981);
+}

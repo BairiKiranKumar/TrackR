@@ -26,16 +26,23 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(searchParams.get('q') ?? '');
   const [results, setResults] = useState<Item[]>([]);
+  const [transactions, setTransactions] = useState<{ id: string; payee?: string; amount: number; date: string; type: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
 
   const doSearch = useCallback(async (q: string) => {
-    if (!q.trim()) { setResults([]); setSearched(false); return; }
+    if (!q.trim()) {
+      setResults([]);
+      setTransactions([]);
+      setSearched(false);
+      return;
+    }
     setLoading(true);
     setSearched(true);
-    const r = await dataService.search(q.trim());
-    setResults(r);
+    const r = await dataService.searchWithFinance(q.trim());
+    setResults(r.items);
+    setTransactions(r.transactions);
     setLoading(false);
   }, []);
 
@@ -51,6 +58,11 @@ function SearchContent() {
     if (typeFilter === 'finance') return results.filter(r => r.type === 'expense' || r.type === 'income' || r.type === 'budget');
     return results.filter(r => r.type === typeFilter);
   }, [results, typeFilter]);
+
+  const filteredTransactions = useMemo(() => {
+    if (typeFilter === 'all' || typeFilter === 'finance') return transactions;
+    return [];
+  }, [transactions, typeFilter]);
 
   // Group results by type
   const grouped = groupByType(filteredResults);
@@ -130,7 +142,7 @@ function SearchContent() {
       )}
 
       {/* No results */}
-      {!loading && searched && results.length === 0 && (
+      {!loading && searched && results.length === 0 && filteredTransactions.length === 0 && (
         <div className="empty-state">
           <span className="empty-state__icon"><SearchIcon size={36} /></span>
           <span className="empty-state__title">No results for &ldquo;{query}&rdquo;</span>
@@ -139,9 +151,49 @@ function SearchContent() {
       )}
 
       {/* Results grouped by type */}
-      {!loading && results.length > 0 && (
+      {!loading && (results.length > 0 || filteredTransactions.length > 0) && (
         <div className={styles.results}>
-          <p className={styles.resultCount}>{results.length} result{results.length !== 1 ? 's' : ''}</p>
+          <p className={styles.resultCount}>
+            {results.length + filteredTransactions.length} result{results.length + filteredTransactions.length !== 1 ? 's' : ''}
+          </p>
+
+          {/* Transactions Group */}
+          {filteredTransactions.length > 0 && (
+            <div className={styles.group}>
+              <div className="section-header">
+                <span className="section-title">TRANSACTIONS</span>
+                <span className={styles.groupCount}>{filteredTransactions.length}</span>
+              </div>
+              <div className={styles.groupList}>
+                {filteredTransactions.map(txn => (
+                  <Link
+                    key={txn.id}
+                    href={`/money/transactions?q=${encodeURIComponent(query)}`}
+                    className={styles.resultCard}
+                    id={`link-result-txn-${txn.id}`}
+                  >
+                    <span className="badge badge--finance" style={{ textTransform: 'capitalize' }}>
+                      {txn.type}
+                    </span>
+                    <div className={styles.resultInfo}>
+                      <div className={styles.resultTitleRow}>
+                        <span className={styles.resultTitle}>
+                          <Highlight text={txn.payee || `${txn.type} transaction`} query={query} />
+                        </span>
+                        <span className={`financial-value ${txn.type === 'income' ? styles.incomeAmount : styles.expenseAmount}`}>
+                          {txn.type === 'income' ? '+' : '-'}₹{txn.amount.toLocaleString()}
+                        </span>
+                      </div>
+                      <span className={styles.resultSnippet}>
+                        {txn.date}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {GROUP_ORDER.map(type => {
             const group = grouped[type];
             if (!group?.length) return null;

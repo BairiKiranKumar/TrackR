@@ -211,7 +211,19 @@ export type SyncStatus = 'idle' | 'pending' | 'syncing' | 'failed' | 'synced' | 
 
 export interface SyncOperation {
   id: string;
-  entityType: 'item' | 'item_relation' | 'database';
+  entityType:
+    | 'item'
+    | 'item_relation'
+    | 'database'
+    | 'fa_account'
+    | 'fa_transaction'
+    | 'fa_category'
+    | 'fa_budget'
+    | 'fa_rule'
+    | 'fa_planned'
+    | 'fa_investment'
+    | 'fa_debt'
+    | 'fa_label';
   entityId: string;
   operation: SyncOperationType;
   payload?: unknown;
@@ -335,7 +347,9 @@ export type RelationType =
   | 'depends_on'
   | 'blocks'
   | 'belongs_to'
-  | 'related_to';
+  | 'related_to'
+  | 'supports'       // transaction supports/funds a goal
+  | 'funded_by';     // goal funded by a transaction
 
 export interface ItemRelation {
   id: string;
@@ -519,3 +533,36 @@ export const INCOME_CATEGORIES: { value: IncomeCategory; label: string; emoji: s
   { value: 'investment', label: 'Investment', emoji: '📈' },
   { value: 'other', label: 'Other', emoji: '💫' },
 ];
+
+// ─── Finance domain re-exports ────────────────────────────────────────────────
+export type {
+  FinanceAccount,
+  FinanceTransaction,
+  FinanceCategory,
+  FinanceLabel,
+  FinanceBudget,
+  FinanceBudgetProgress,
+  FinanceRule,
+  FinancePlannedPayment,
+  FinanceInvestment,
+  FinanceDebt,
+  CurrencyRate,
+  NetWorthSnapshot,
+  CashFlowEntry,
+  CategoryTotal,
+  MonthlyTotal,
+  DateRange,
+  FinanceExportPayload,
+  CsvImportResult,
+  CsvColumnMap,
+  CsvImportRow,
+  AccountType,
+  TransactionType,
+  BudgetPeriod,
+  DebtDirection,
+  DebtStatus,
+  InvestmentAssetType,
+  Recurrence,
+  RuleCondition,
+  RuleAction,
+} from './finance';

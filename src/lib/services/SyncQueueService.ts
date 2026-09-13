@@ -202,6 +202,11 @@ class SyncQueueService {
           await provider.upsertItem(op.payload as Item);
         } else if (op.entityType === 'item_relation' && op.payload) {
           await provider.upsertRelation(op.payload as ItemRelation);
+        } else if (op.entityType.startsWith('fa_')) {
+          const anyProvider = provider as unknown as { upsertFinanceEntity?: (entityType: string, payload: unknown) => Promise<void> };
+          if (typeof anyProvider.upsertFinanceEntity === 'function' && op.payload) {
+            await anyProvider.upsertFinanceEntity(op.entityType, op.payload);
+          }
         }
         break;
       }
@@ -210,6 +215,11 @@ class SyncQueueService {
           await provider.deleteItem(op.entityId);
         } else if (op.entityType === 'item_relation') {
           await provider.deleteRelation(op.entityId);
+        } else if (op.entityType.startsWith('fa_')) {
+          const anyProvider = provider as unknown as { deleteFinanceEntity?: (entityType: string, id: string) => Promise<void> };
+          if (typeof anyProvider.deleteFinanceEntity === 'function') {
+            await anyProvider.deleteFinanceEntity(op.entityType, op.entityId);
+          }
         }
         break;
       }

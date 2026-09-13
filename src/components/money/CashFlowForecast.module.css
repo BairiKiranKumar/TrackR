@@ -1,0 +1,88 @@
+.container {
+  background: var(--bg-card, #131317);
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #f4f4f6);
+}
+
+.currentBalanceChip {
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  background: var(--bg-elevated, #202028);
+  border-radius: 8px;
+  color: var(--text-secondary, #9e9ead);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--bg-secondary, #111114);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 10px;
+}
+
+.itemMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.itemTitle {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary, #f4f4f6);
+}
+
+.itemDate {
+  font-size: 0.78rem;
+  color: var(--text-tertiary, #636375);
+}
+
+.itemValues {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.itemAmount {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-danger, #ef4444);
+}
+
+.projectedBalance {
+  font-size: 0.78rem;
+  color: var(--text-tertiary, #636375);
+}
+
+.empty {
+  padding: 24px 0;
+  text-align: center;
+  color: var(--text-tertiary, #636375);
+  font-size: 0.88rem;
+}

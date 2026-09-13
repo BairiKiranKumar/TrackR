@@ -188,9 +188,176 @@ drop policy if exists "user_settings_all_own" on public.user_settings;
 create policy "user_settings_all_own" on public.user_settings for all
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- ── Verification ─────────────────────────────────────────────────────────
--- As User A (signed in via the app, browser devtools):
---   await supabase.from('items').select('*')            -- only A's rows
---   await supabase.from('items').select('*').eq('user_id', '<B's uuid>')  -- empty, not an error
---   await supabase.from('items').insert({ id: 'x', user_id: '<B's uuid>', type: 'note', title: 'hi' })
---     -- must be REJECTED (RLS insert policy requires auth.uid() = user_id)
+-- ── Finance Tables (Phase 2) ──────────────────────────────────────────────
+
+-- fa_accounts
+create table if not exists public.fa_accounts (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null,
+  institution     text,
+  type            text not null,
+  currency        text not null default 'INR',
+  opening_balance numeric not null default 0,
+  current_balance numeric not null default 0,
+  notes           text,
+  archived        boolean default false,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_accounts_user_id_idx on public.fa_accounts(user_id);
+alter table public.fa_accounts enable row level security;
+create policy "fa_accounts_own" on public.fa_accounts for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_transactions
+create table if not exists public.fa_transactions (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  account_id      text not null references public.fa_accounts(id) on delete cascade,
+  date            date not null,
+  amount          numeric not null,
+  currency        text not null default 'INR',
+  type            text not null,
+  category_id     text,
+  payee           text,
+  note            text,
+  labels          text[] default '{}',
+  project_id      text,
+  goal_id         text,
+  recurring_id    text,
+  transfer_id     text,
+  source          text default 'manual',
+  rule_executions jsonb default '[]',
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_transactions_user_id_idx on public.fa_transactions(user_id);
+create index if not exists fa_transactions_account_idx on public.fa_transactions(user_id, account_id);
+create index if not exists fa_transactions_date_idx on public.fa_transactions(user_id, date desc);
+create index if not exists fa_transactions_cat_idx on public.fa_transactions(user_id, category_id);
+alter table public.fa_transactions enable row level security;
+create policy "fa_transactions_own" on public.fa_transactions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_categories
+create table if not exists public.fa_categories (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null,
+  parent_id       text references public.fa_categories(id) on delete set null,
+  type            text not null,
+  icon            text,
+  archived        boolean default false,
+  sort_order      integer default 0,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_categories_user_id_idx on public.fa_categories(user_id);
+alter table public.fa_categories enable row level security;
+create policy "fa_categories_own" on public.fa_categories for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_budgets
+create table if not exists public.fa_budgets (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null,
+  target          numeric not null,
+  period          text not null,
+  category_id     text,
+  rollover        boolean default false,
+  alert_threshold numeric default 0.8,
+  start_date      date,
+  end_date        date,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_budgets_user_id_idx on public.fa_budgets(user_id);
+alter table public.fa_budgets enable row level security;
+create policy "fa_budgets_own" on public.fa_budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_rules
+create table if not exists public.fa_rules (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null,
+  conditions      jsonb not null default '[]',
+  actions         jsonb not null default '[]',
+  priority        integer default 0,
+  enabled         boolean default true,
+  execution_count integer default 0,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_rules_user_id_idx on public.fa_rules(user_id);
+alter table public.fa_rules enable row level security;
+create policy "fa_rules_own" on public.fa_rules for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_planned_payments
+create table if not exists public.fa_planned_payments (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null,
+  amount          numeric not null,
+  currency        text not null default 'INR',
+  account_id      text not null references public.fa_accounts(id) on delete cascade,
+  category_id     text,
+  due_date        date not null,
+  recurrence      jsonb,
+  status          text not null default 'pending',
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_planned_user_id_idx on public.fa_planned_payments(user_id);
+alter table public.fa_planned_payments enable row level security;
+create policy "fa_planned_own" on public.fa_planned_payments for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_investments
+create table if not exists public.fa_investments (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  asset_name      text not null,
+  asset_type      text not null,
+  quantity        numeric not null default 0,
+  avg_price       numeric not null default 0,
+  current_price   numeric not null default 0,
+  currency        text not null default 'INR',
+  account_id      text references public.fa_accounts(id) on delete set null,
+  last_updated_at timestamptz default now(),
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_investments_user_id_idx on public.fa_investments(user_id);
+alter table public.fa_investments enable row level security;
+create policy "fa_investments_own" on public.fa_investments for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_debts
+create table if not exists public.fa_debts (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  person          text not null,
+  direction       text not null,
+  amount          numeric not null,
+  currency        text not null default 'INR',
+  date            date not null,
+  due_date        date,
+  repayments      jsonb default '[]',
+  status          text not null default 'active',
+  notes           text,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_debts_user_id_idx on public.fa_debts(user_id);
+alter table public.fa_debts enable row level security;
+create policy "fa_debts_own" on public.fa_debts for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- fa_labels
+create table if not exists public.fa_labels (
+  id              text primary key,
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null,
+  color           text not null,
+  created_at      timestamptz default now(),
+  updated_at      timestamptz default now()
+);
+create index if not exists fa_labels_user_id_idx on public.fa_labels(user_id);
+alter table public.fa_labels enable row level security;
+create policy "fa_labels_own" on public.fa_labels for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
