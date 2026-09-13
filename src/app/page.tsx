@@ -14,11 +14,13 @@ import {
   PlusCircle,
   Edit3,
   ArrowRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
+import { contextGraphService } from '@/lib/services/ContextGraphService';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Item, TrackerMetadata, TaskMetadata, ProjectMetadata, ProjectContextSummary } from '@/types';
+import { Item, TrackerMetadata, TaskMetadata, ProjectMetadata, ProjectContextSummary, AttentionItem } from '@/types';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import LandingPage from './landing';
 import styles from './page.module.css';
@@ -46,6 +48,8 @@ function HomeDashboard() {
   const [monthlyTotals, setMonthlyTotals] = useState({ income: 0, expenses: 0, net: 0 });
   const [projectContexts, setProjectContexts] = useState<Record<string, ProjectContextSummary | null>>({});
   const [recentActivity, setRecentActivity] = useState<{ id: string; description: string; type: string; time: string }[]>([]);
+  const [attentionItems, setAttentionItems] = useState<AttentionItem[]>([]);
+  const [goalProgresses, setGoalProgresses] = useState<Record<string, { percentage: number; label: string }>>({});
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -57,6 +61,11 @@ function HomeDashboard() {
 
   const activeTrackers = useMemo(
     () => items.filter(i => i.type === 'tracker' && !i.archived).slice(0, 3),
+    [items]
+  );
+
+  const activeGoals = useMemo(
+    () => items.filter(i => i.type === 'goal' && !i.archived).slice(0, 3),
     [items]
   );
 
@@ -79,14 +88,16 @@ function HomeDashboard() {
     let active = true;
 
     async function load() {
-      const [tasks, totals, activity] = await Promise.all([
+      const [tasks, totals, activity, attention] = await Promise.all([
         dataService.getTodayTasks(),
         dataService.getMonthlyTotals(),
         dataService.getRecentActivity(10),
+        contextGraphService.getAttentionItems(),
       ]);
       if (!active) return;
       setTodayTasks(tasks.slice(0, 5));
       setMonthlyTotals(totals);
+      setAttentionItems(attention);
 
       const actItems = activity.slice(0, 6).map(a => ({
         id: a.id,
@@ -110,11 +121,27 @@ function HomeDashboard() {
       if (active) {
         setProjectContexts(contexts);
       }
+
+      // Load goal progresses
+      const gProgs: Record<string, { percentage: number; label: string }> = {};
+      await Promise.all(
+        activeGoals.map(async (g) => {
+          try {
+            const p = await contextGraphService.calculateGoalProgress(g.id);
+            if (p) gProgs[g.id] = { percentage: p.percentage, label: p.label };
+          } catch {
+            // ignore
+          }
+        })
+      );
+      if (active) {
+        setGoalProgresses(gProgs);
+      }
     }
 
     load();
     return () => { active = false; };
-  }, [isReady, items, activeProjects]);
+  }, [isReady, items, activeProjects, activeGoals]);
 
   async function handleCompleteTask(taskId: string) {
     await dataService.completeTask(taskId);
@@ -134,6 +161,41 @@ function HomeDashboard() {
           <p className={styles.greetingDate}>{format(new Date(), 'EEEE, MMMM d')}</p>
         </div>
       </div>
+
+      {/* Smart Attention Engine */}
+      {attentionItems.length > 0 && (
+        <section className={styles.attentionSection} id="section-attention">
+          <div className={styles.attentionHeader}>
+            <div className={styles.attentionTitleRow}>
+              <AlertTriangle size={16} className={styles.attentionIcon} />
+              <span className="section-title">Needs Attention</span>
+              <span className="badge badge-warning">{attentionItems.length}</span>
+            </div>
+          </div>
+          <div className={styles.attentionList}>
+            {attentionItems.slice(0, 4).map(att => (
+              <Link
+                key={att.id}
+                href={att.actionUrl}
+                className={`${styles.attentionCard} ${
+                  att.severity === 'urgent'
+                    ? styles.attentionHigh
+                    : att.severity === 'warning'
+                    ? styles.attentionMedium
+                    : styles.attentionLow
+                }`}
+                id={`link-attention-${att.id}`}
+              >
+                <div className={styles.attentionCardLeft}>
+                  <span className={styles.attentionCardTitle}>{att.title}</span>
+                  <span className={styles.attentionCardReason}>{att.message}</span>
+                </div>
+                <ArrowRight size={14} className={styles.attentionActionArrow} />
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Inbox Triage Prompt */}
       {inboxCount > 0 && (
@@ -222,7 +284,7 @@ function HomeDashboard() {
               return (
                 <Link
                   key={proj.id}
-                  href={`/track/${proj.id}`}
+                  href={`/projects/${proj.id}`}
                   className={styles.projectSpotlightCard}
                   style={{ borderLeftColor: color }}
                 >
@@ -307,7 +369,57 @@ function HomeDashboard() {
         </section>
       )}
 
-      {/* 6. RECENT NOTES */}
+      {/* 6. GOALS IN MOTION */}
+      {activeGoals.length > 0 && (
+        <section className={styles.section}>
+          <div className="section-header">
+            <span className="section-title">Goals in Motion</span>
+            <Link href="/track" className={styles.seeAll} id="link-home-goals-all">
+              See all <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className={styles.trackerCards}>
+            {activeGoals.map(goal => {
+              const prog = goalProgresses[goal.id];
+              const pct = prog?.percentage ?? 0;
+              return (
+                <Link
+                  key={goal.id}
+                  href={`/track/${goal.id}`}
+                  className={styles.trackerCard}
+                  id={`link-home-goal-${goal.id}`}
+                >
+                  <div className={styles.trackerHeader}>
+                    <div className={styles.trackerIconWrap} style={{ color: 'var(--color-goal, #f59e0b)' }}>
+                      <Target size={16} />
+                    </div>
+                    <div className={styles.trackerInfo}>
+                      <span className={styles.trackerName}>{goal.title}</span>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>
+                        {prog?.label || 'Goal progress'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.trackerProgress}>
+                    <div className="progress-track" style={{ height: 6 }}>
+                      <div
+                        className="progress-fill"
+                        style={{
+                          width: `${pct}%`,
+                          background: 'var(--color-goal, #f59e0b)',
+                        }}
+                      />
+                    </div>
+                    <span className={styles.trackerPct}>{Math.round(pct)}%</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* 7. RECENT NOTES */}
       {recentNotes.length > 0 && (
         <section className={styles.section}>
           <div className="section-header">

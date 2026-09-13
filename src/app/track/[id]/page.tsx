@@ -42,6 +42,8 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { ItemTypeBadge, getItemTypeIcon } from '@/components/common/ItemTypeBadge';
+import { ContextPanel } from '@/components/context/ContextPanel';
+import { contextGraphService } from '@/lib/services/ContextGraphService';
 import styles from './page.module.css';
 
 export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -83,6 +85,15 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
   const [linkSearch, setLinkSearch] = useState('');
   const [linkRelationType, setLinkRelationType] = useState<RelationType>('linked');
 
+  // Goal progress state
+  const [goalProgress, setGoalProgress] = useState<{
+    percentage: number;
+    current: number;
+    target: number;
+    source: 'manual' | 'tasks' | 'tracker' | 'financial';
+    label: string;
+  } | null>(null);
+
   // Quick task input for projects
   const [newProjectTask, setNewProjectTask] = useState('');
 
@@ -116,6 +127,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     } else if (found.type === 'task') {
       const deps = await dataService.getTaskDependencies(found.id);
       setDependencies(deps);
+    } else if (found.type === 'goal') {
+      const gp = await contextGraphService.calculateGoalProgress(found.id);
+      setGoalProgress(gp);
     } else if (found.type === 'tracker' || found.type === 'habit') {
       const [entries, stats] = await Promise.all([
         dataService.getTrackerEntries(found.id),
@@ -163,11 +177,6 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
     await dataService.linkItems(item.id, targetId, linkRelationType);
     setShowLinkModal(false);
     setLinkSearch('');
-    await loadData();
-  }
-
-  async function handleUnlink(sourceId: string, targetId: string) {
-    await dataService.unlinkItems(sourceId, targetId);
     await loadData();
   }
 
@@ -694,8 +703,9 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
 
     if (currItem.type === 'goal') {
       const target = (meta.targetAmount as number) ?? 0;
-      const current = (meta.currentAmount as number) ?? 0;
-      const pct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+      const current = goalProgress ? goalProgress.current : ((meta.currentAmount as number) ?? 0);
+      const pct = goalProgress ? goalProgress.percentage : (target > 0 ? Math.min(100, (current / target) * 100) : 0);
+      const source = (meta.progressSource as string) || 'manual';
 
       return (
         <div className={styles.goalContent}>
@@ -707,12 +717,44 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
           </div>
           <div className={styles.goalAmountRow}>
             <span style={{ color: 'var(--color-success)', fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>
-              {formatAmount(current)}
+              {source === 'financial' ? `₹${current.toLocaleString('en-IN')}` : (source === 'tasks' ? `${current} tasks` : `${current}`)}
             </span>
-            <span style={{ color: 'var(--text-tertiary)' }}> of {formatAmount(target)}</span>
+            {target > 0 && (
+              <span style={{ color: 'var(--text-tertiary)' }}>
+                {' '}of {source === 'financial' ? `₹${target.toLocaleString('en-IN')}` : `${target}`}
+              </span>
+            )}
           </div>
           <div className="progress-track" style={{ height: 8 }}>
             <div className="progress-fill" style={{ width: `${pct}%`, background: 'var(--color-goal)' }} />
+          </div>
+
+          {goalProgress?.label && (
+            <div style={{ marginTop: '0.75rem', fontSize: '0.8125rem', color: 'var(--text-secondary)', background: 'var(--bg-card)', padding: '0.5rem 0.75rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+              🎯 {goalProgress.label}
+            </div>
+          )}
+
+          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>Progress Source:</label>
+            <select
+              className={styles.lifecycleSelect}
+              value={source}
+              onChange={async (e) => {
+                const newSource = e.target.value;
+                await dataService.updateItem(currItem.id, {
+                  metadata: { ...meta, progressSource: newSource },
+                });
+                await loadData();
+              }}
+              style={{ fontSize: '0.8125rem', padding: '0.25rem 0.5rem' }}
+              id="select-goal-progress-source"
+            >
+              <option value="manual">Manual (Current Amount)</option>
+              <option value="financial">Financial (Linked Transactions)</option>
+              <option value="tasks">Tasks (Completed / Total)</option>
+              <option value="tracker">Tracker Value</option>
+            </select>
           </div>
         </div>
       );
@@ -1119,84 +1161,13 @@ export default function ItemDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {/* Outgoing references */}
-      {outgoing.length > 0 && (
-        <div className={styles.section}>
-          <div className="section-header">
-            <span className="section-title">Linked Outgoing Items</span>
-            <span className={styles.count}>{outgoing.length}</span>
-          </div>
-          <div className={styles.refList}>
-            {outgoing.map(({ item: ref, relation }) => (
-              <div key={ref.id} className={styles.refCardWrap}>
-                <Link
-                  href={ref.type === 'note' || ref.type === 'journal' ? `/notes/${ref.id}` : `/track/${ref.id}`}
-                  className={styles.refCard}
-                  id={`link-ref-${ref.id}`}
-                >
-                  <span className={styles.refEmoji}>{getItemTypeIcon(ref.type, 16)}</span>
-                  <div className={styles.refInfo}>
-                    <span className={styles.refTitle}>{ref.title}</span>
-                    <span className={styles.refType}>
-                      {ITEM_TYPE_LABELS[ref.type]} • {relation.relationType}
-                    </span>
-                  </div>
-                  <ExternalLink size={14} className={styles.refIcon} />
-                </Link>
-                <button
-                  className={styles.unlinkBtn}
-                  onClick={() => handleUnlink(item.id, ref.id)}
-                  title="Remove connection"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Backlinks — the knowledge graph magic */}
-      <div className={styles.section}>
-        <div className="section-header">
-          <span className="section-title">Backlinks & Linked Context</span>
-          <span className={styles.count}>{backlinks.length}</span>
-        </div>
-        {backlinks.length === 0 ? (
-          <p className={styles.emptyText}>
-            No items reference this yet. Mention @{item.title} or click &quot;Link Item&quot; to connect it.
-          </p>
-        ) : (
-          <div className={styles.refList}>
-            {backlinks.map(({ item: src, relation }) => (
-              <div key={src.id} className={styles.refCardWrap}>
-                <Link
-                  key={src.id}
-                  href={src.type === 'note' || src.type === 'journal' ? `/notes/${src.id}` : `/track/${src.id}`}
-                  className={styles.refCard}
-                  id={`link-backlink-${src.id}`}
-                >
-                  <span className={styles.refEmoji}>{getItemTypeIcon(src.type, 16)}</span>
-                  <div className={styles.refInfo}>
-                    <span className={styles.refTitle}>{src.title}</span>
-                    <span className={styles.refType}>
-                      {ITEM_TYPE_LABELS[src.type]} • {relation.relationType} • {format(new Date(src.updatedAt), 'MMM d')}
-                    </span>
-                  </div>
-                  <ExternalLink size={14} className={styles.refIcon} />
-                </Link>
-                <button
-                  className={styles.unlinkBtn}
-                  onClick={() => handleUnlink(src.id, item.id)}
-                  title="Remove connection"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Universal Context Panel */}
+      <ContextPanel
+        entityId={item.id}
+        entityType={item.type}
+        entityTitle={item.title}
+        onLinkChanged={loadData}
+      />
 
       {/* Manual Link Modal */}
       {showLinkModal && (

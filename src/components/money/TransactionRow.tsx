@@ -12,6 +12,7 @@ interface TransactionRowProps {
   categoryIcon?: string;
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
+  onClick?: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
 }
@@ -23,6 +24,7 @@ export function TransactionRow({
   categoryIcon,
   selected = false,
   onSelect,
+  onClick,
   onDuplicate,
   onDelete,
 }: TransactionRowProps) {
@@ -50,8 +52,8 @@ export function TransactionRow({
             id={`txn-select-${transaction.id}`}
           />
         )}
-        <div className={styles.iconWrap}>{icon}</div>
-        <div className={styles.meta}>
+        <div className={styles.iconWrap} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>{icon}</div>
+        <div className={styles.meta} onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
           <span className={styles.payee}>{title}</span>
           <div className={styles.subRow}>
             <span>{transaction.date}</span>

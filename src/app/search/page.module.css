@@ -280,3 +280,145 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.resultCardWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.875rem 1rem;
+  transition: border-color var(--transition-fast);
+}
+
+.resultCardWrapper:hover {
+  border-color: var(--border-default);
+}
+
+.resultTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.resultMainLink {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.viewContextBtn {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent-primary, #8b5cf6);
+  background: var(--bg-card-hover, rgba(139, 92, 246, 0.08));
+  border: 1px solid var(--border-subtle, rgba(139, 92, 246, 0.2));
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.viewContextBtn:hover {
+  background: var(--accent-primary, #8b5cf6);
+  color: white;
+}
+
+.inlineContextBox {
+  margin-top: 0.5rem;
+  padding: 0.875rem;
+  background: var(--bg-primary, #0d0d0f);
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+}
+
+.filterControlsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.filterToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.filterToggleBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.filterToggleBtnActive {
+  background: var(--accent-glow, rgba(139, 92, 246, 0.15));
+  border-color: var(--accent-primary, #8b5cf6);
+  color: var(--accent-primary, #8b5cf6);
+}
+
+.filterTray {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: var(--space-5);
+}
+
+.filterTrayGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.filterGroupLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+
+.filterSelect,
+.filterInput {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.filterTrayFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+}

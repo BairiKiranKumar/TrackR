@@ -5,7 +5,7 @@ import {
   saveActivityEvent, searchItems, getSetting, setSetting, getAllRelations,
   deleteItem as localDeleteItem, deleteRelationsForItem, clearAllData as localClearAllData,
   deleteRelation, deleteRelationByPair, getAllActivityEvents, getAllSyncOps,
-  searchFinanceTransactions,
+  searchFinanceTransactions, getAllFinanceData, importFinanceData,
 } from '@/lib/db/localDb';
 import {
   financeTransactionService,
@@ -698,18 +698,20 @@ class DataService {
   // ── Data Export & Schema-Validated Import ───────────────────────────────
 
   async exportFullData(): Promise<string> {
-    const [items, relations, activityEvents] = await Promise.all([
+    const [items, relations, activityEvents, finance] = await Promise.all([
       getAllItems(),
       getAllRelations(),
       getAllActivityEvents(),
+      getAllFinanceData(),
     ]);
 
     const exportPayload = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       items,
       relations,
       activityEvents,
+      finance,
     };
 
     return JSON.stringify(exportPayload, null, 2);
@@ -764,6 +766,10 @@ class DataService {
             relationsCount++;
           }
         }
+      }
+
+      if (data.finance && typeof data.finance === 'object') {
+        await importFinanceData(data.finance);
       }
 
       return { success: true, itemsCount: itemsToSave.length, relationsCount };
@@ -877,7 +883,20 @@ class DataService {
 
   // ── Finance-aware search (extends base search) ─────────────────────────────
 
-  async searchWithFinance(query: string): Promise<{ items: Item[]; transactions: { id: string; payee?: string; amount: number; date: string; type: string }[] }> {
+  async searchWithFinance(query: string): Promise<{
+    items: Item[];
+    transactions: {
+      id: string;
+      payee?: string;
+      amount: number;
+      date: string;
+      type: string;
+      categoryId?: string;
+      accountId?: string;
+      projectId?: string;
+      goalId?: string;
+    }[];
+  }> {
     const [items, transactions] = await Promise.all([
       searchItems(query),
       searchFinanceTransactions(query),
@@ -890,6 +909,10 @@ class DataService {
         amount: t.amount,
         date: t.date,
         type: t.type,
+        categoryId: t.categoryId,
+        accountId: t.accountId,
+        projectId: t.projectId,
+        goalId: t.goalId,
       })),
     };
   }

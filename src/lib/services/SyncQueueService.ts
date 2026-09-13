@@ -102,7 +102,7 @@ class SyncQueueService {
   }
 
   public async enqueue(
-    entityType: 'item' | 'item_relation' | 'database',
+    entityType: SyncOperation['entityType'],
     entityId: string,
     operation: SyncOperationType,
     payload?: unknown

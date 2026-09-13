@@ -5,6 +5,7 @@ import { Command, FilePlus2, Search, X } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { QuickAdd } from './QuickAdd';
+import { CommandPalette } from './CommandPalette';
 import styles from './GlobalShortcuts.module.css';
 
 type QuickAddMode = 'all' | 'note' | null;
@@ -20,6 +21,7 @@ export function GlobalShortcuts() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [quickAddMode, setQuickAddMode] = useState<QuickAddMode>(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
@@ -40,6 +42,10 @@ export function GlobalShortcuts() {
           setHelpOpen(false);
           return;
         }
+        if (commandPaletteOpen) {
+          setCommandPaletteOpen(false);
+          return;
+        }
         if (quickAddMode) {
           setQuickAddMode(null);
           return;
@@ -51,7 +57,7 @@ export function GlobalShortcuts() {
       const key = event.key.toLowerCase();
       if (key === 'k') {
         event.preventDefault();
-        setQuickAddMode('all');
+        setCommandPaletteOpen(prev => !prev);
       } else if (key === 'n') {
         event.preventDefault();
         setQuickAddMode('note');
@@ -66,10 +72,16 @@ export function GlobalShortcuts() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [helpOpen, pathname, quickAddMode, router, user]);
+  }, [commandPaletteOpen, helpOpen, pathname, quickAddMode, router, user]);
 
   return (
     <>
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onOpenQuickAdd={() => setQuickAddMode('all')}
+      />
+
       {quickAddMode && (
         <QuickAdd
           initialType={quickAddMode === 'note' ? 'note' : undefined}
@@ -96,7 +108,7 @@ export function GlobalShortcuts() {
               </button>
             </div>
             <div className={styles.shortcuts}>
-              <Shortcut keys="K" label="Open Quick Add" icon={<Command size={16} />} />
+              <Shortcut keys="K" label="Command Palette & Quick Search" icon={<Command size={16} />} />
               <Shortcut keys="N" label="Create a new note" icon={<FilePlus2 size={16} />} />
               <Shortcut keys="F" label="Focus search" icon={<Search size={16} />} />
               <Shortcut keys="/" label="Show this help" icon={<Command size={16} />} />

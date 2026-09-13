@@ -12,6 +12,7 @@ import styles from './NoteEditor.module.css';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { format } from 'date-fns';
+import { ContextPanel } from '@/components/context/ContextPanel';
 
 interface NoteEditorProps {
   item: Item;
@@ -297,6 +298,16 @@ export function NoteEditor({ item, onSaved }: NoteEditorProps) {
           aria-multiline="true"
           aria-label="Note content"
         />
+
+        {/* Universal Context Panel */}
+        <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1.5rem' }}>
+          <ContextPanel
+            entityId={item.id}
+            entityType="note"
+            entityTitle={title || item.title || 'Untitled Note'}
+            onLinkChanged={refreshItems}
+          />
+        </div>
       </div>
 
       {/* Money detection banner */}

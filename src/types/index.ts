@@ -1,3 +1,5 @@
+import type { FinanceTransaction, FinanceBudget } from './finance';
+
 // ─── Item Types ────────────────────────────────────────────────────────────
 
 export type ItemType =
@@ -166,6 +168,8 @@ export interface GoalMetadata {
   deadline?: string;
   isFinancial: boolean;
   projectId?: string;
+  progressSource?: 'manual' | 'tasks' | 'tracker' | 'financial';
+  trackerId?: string;
   [key: string]: unknown;
 }
 
@@ -348,8 +352,9 @@ export type RelationType =
   | 'blocks'
   | 'belongs_to'
   | 'related_to'
-  | 'supports'       // transaction supports/funds a goal
-  | 'funded_by';     // goal funded by a transaction
+  | 'supports'       // transaction supports/funds a goal, task/project supports goal
+  | 'funds'          // transaction funds a project or goal
+  | 'funded_by';     // goal or project funded by a transaction
 
 export interface ItemRelation {
   id: string;
@@ -357,6 +362,91 @@ export interface ItemRelation {
   targetId: string;
   relationType: RelationType;
   createdAt: string;
+}
+
+export function isValidRelation(
+  sourceType: string,
+  relationType: RelationType,
+  targetType: string
+): boolean {
+  if (!sourceType || !targetType || !relationType) return false;
+
+  // Self relations are invalid
+  if (sourceType === targetType && (relationType === 'belongs_to' || relationType === 'supports' || relationType === 'funds' || relationType === 'funded_by')) {
+    if (sourceType !== 'task') return false;
+  }
+
+  // Task dependency semantics: depends_on and blocks are ONLY between tasks
+  if (relationType === 'depends_on' || relationType === 'blocks') {
+    return sourceType === 'task' && targetType === 'task';
+  }
+
+  // Belongs to: items or transactions belong to projects (or sub-tasks/goals)
+  if (relationType === 'belongs_to') {
+    const validSources = ['task', 'note', 'journal', 'tracker', 'habit', 'expense', 'income', 'budget', 'transaction'];
+    const validTargets = ['project', 'goal', 'task'];
+    return validSources.includes(sourceType) && validTargets.includes(targetType);
+  }
+
+  // Supports: tasks, trackers, projects, transactions support goals or projects
+  if (relationType === 'supports') {
+    const validSources = ['task', 'tracker', 'habit', 'project', 'expense', 'income', 'transaction'];
+    const validTargets = ['goal', 'project'];
+    return validSources.includes(sourceType) && validTargets.includes(targetType);
+  }
+
+  // Funds: transactions/budgets fund projects or goals
+  if (relationType === 'funds') {
+    const validSources = ['transaction', 'expense', 'income', 'budget'];
+    const validTargets = ['goal', 'project'];
+    return validSources.includes(sourceType) && validTargets.includes(targetType);
+  }
+
+  // Funded by: goals or projects funded by transactions/budgets
+  if (relationType === 'funded_by') {
+    const validSources = ['goal', 'project'];
+    const validTargets = ['transaction', 'expense', 'income', 'budget'];
+    return validSources.includes(sourceType) && validTargets.includes(targetType);
+  }
+
+  // General relations: related_to, references, linked, contains, parent, child
+  if (relationType === 'related_to' || relationType === 'references' || relationType === 'linked') {
+    return true;
+  }
+  if (relationType === 'contains' || relationType === 'parent' || relationType === 'child') {
+    return true;
+  }
+
+  return false;
+}
+
+export interface ContextSummary {
+  entityId: string;
+  entityType: string;
+  entityTitle: string;
+  tasks: Item[];
+  projects: Item[];
+  notes: Item[];
+  goals: Item[];
+  trackers: Item[];
+  transactions: FinanceTransaction[];
+  budgets: FinanceBudget[];
+  relatedItems: { item: Item | FinanceTransaction; reason: string }[];
+  totalCount: number;
+}
+
+export type AttentionSeverity = 'urgent' | 'warning' | 'info';
+
+export interface AttentionItem {
+  id: string;
+  type: 'overdue_task' | 'budget_warning' | 'planned_payment' | 'goal_deadline' | 'blocked_project' | 'missed_tracker';
+  title: string;
+  message: string;
+  severity: AttentionSeverity;
+  entityId: string;
+  entityType: string;
+  actionUrl: string;
+  date?: string;
 }
 
 // ─── Activity ──────────────────────────────────────────────────────────────

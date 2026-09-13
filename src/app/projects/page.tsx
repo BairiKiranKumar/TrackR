@@ -222,7 +222,7 @@ export default function ProjectsPage() {
               return (
                 <Link
                   key={project.id}
-                  href={`/track/${project.id}`}
+                  href={`/projects/${project.id}`}
                   className={styles.projectCard}
                   style={{ '--project-accent': color } as React.CSSProperties}
                 >

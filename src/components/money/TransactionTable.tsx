@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { FinanceTransaction, FinanceAccount, FinanceCategory } from '@/types/finance';
 import { TransactionRow } from './TransactionRow';
+import { TransactionDetailDrawer } from './TransactionDetailDrawer';
 import styles from './TransactionTable.module.css';
 
 interface TransactionTableProps {
@@ -29,6 +30,7 @@ export function TransactionTable({
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [inspectingTxn, setInspectingTxn] = useState<FinanceTransaction | null>(null);
 
   const accountMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -200,6 +202,7 @@ export function TransactionTable({
                 categoryIcon={cat?.icon}
                 selected={selectedIds.has(t.id)}
                 onSelect={checked => handleSelectRow(t.id, checked)}
+                onClick={() => setInspectingTxn(t)}
                 onDuplicate={onDuplicate ? () => onDuplicate(t.id) : undefined}
                 onDelete={onDelete ? () => onDelete(t.id) : undefined}
               />
@@ -207,6 +210,16 @@ export function TransactionTable({
           })}
         </div>
       )}
+
+      {/* Transaction Deep Context Drawer */}
+      <TransactionDetailDrawer
+        transaction={inspectingTxn}
+        accountName={inspectingTxn ? accountMap.get(inspectingTxn.accountId) : undefined}
+        categoryName={inspectingTxn?.categoryId ? categoryMap.get(inspectingTxn.categoryId)?.name : undefined}
+        categoryIcon={inspectingTxn?.categoryId ? categoryMap.get(inspectingTxn.categoryId)?.icon : undefined}
+        isOpen={Boolean(inspectingTxn)}
+        onClose={() => setInspectingTxn(null)}
+      />
     </div>
   );
 }

@@ -618,3 +618,90 @@
   color: var(--text-tertiary);
   flex-shrink: 0;
 }
+
+/* Smart Attention Engine */
+.attentionSection {
+  margin-bottom: var(--space-6);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+}
+
+.attentionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.attentionTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.attentionIcon {
+  color: var(--color-warning, #f59e0b);
+}
+
+.attentionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.attentionCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--bg-surface, #18181b);
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+  color: inherit;
+  transition: all var(--transition-fast);
+}
+
+.attentionCard:hover {
+  border-color: var(--border-default);
+  background: var(--bg-card-hover);
+}
+
+.attentionHigh {
+  border-left: 3px solid var(--color-danger, #ef4444);
+}
+
+.attentionMedium {
+  border-left: 3px solid var(--color-warning, #f59e0b);
+}
+
+.attentionLow {
+  border-left: 3px solid var(--accent-primary, #8b5cf6);
+}
+
+.attentionCardLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.attentionCardTitle {
+  font-size: 0.84375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.attentionCardReason {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.attentionActionArrow {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
