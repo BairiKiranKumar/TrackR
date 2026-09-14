@@ -17,6 +17,7 @@ import {
 } from '@/lib/db/localDb';
 import { AutomationConditionEvaluator } from './AutomationConditionEvaluator';
 import { AutomationRuleSimulator } from './AutomationRuleSimulator';
+import { syncQueueService } from '../SyncQueueService';
 
 export interface AutomationExecutionResult<T = Record<string, unknown>> {
   entity: T;
@@ -74,6 +75,7 @@ export class AutomationEngine {
     };
 
     await saveAutomationRule(rule);
+    await syncQueueService.enqueue('fa_automation', rule.id, 'upsert', rule);
     return rule;
   }
 
@@ -90,11 +92,13 @@ export class AutomationEngine {
     };
 
     await saveAutomationRule(updated);
+    await syncQueueService.enqueue('fa_automation', updated.id, 'upsert', updated);
     return updated;
   }
 
   async deleteRule(id: string): Promise<void> {
     await deleteAutomationRule(id);
+    await syncQueueService.enqueue('fa_automation', id, 'delete');
   }
 
   async reorderRules(ids: string[]): Promise<void> {
@@ -214,6 +218,7 @@ export class AutomationEngine {
         };
 
         await saveAutomationExecution(execution);
+        await syncQueueService.enqueue('fa_automation_history', execution.id, 'upsert', execution);
         executions.push(execution);
 
         // Update rule execution count

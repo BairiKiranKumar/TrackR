@@ -172,6 +172,30 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleDeleteAccount() {
+    const confirmed = await confirm({
+      title: 'Delete Account & All Cloud Data?',
+      message: 'This permanently erases all your data from TRACKR Cloud and this device, cancels your session, and returns you to sign-in. This action CANNOT be undone.',
+      confirmLabel: 'Delete My Account',
+      danger: true,
+      requirePhrase: 'DELETE',
+    });
+    if (!confirmed) return;
+
+    setClearing(true);
+    try {
+      await dataService.deleteAccountData();
+      await signOut();
+      showToast('Your account and all associated data have been permanently deleted.', 'info');
+      router.replace('/auth');
+    } catch (err) {
+      console.error('Account delete error:', err);
+      showToast('Failed to complete account deletion. Please try again.', 'error');
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -540,14 +564,35 @@ export default function SettingsPage() {
               <Trash2 size={16} className={styles.dangerIcon} />
               <div className={styles.actionRowInfo}>
                 <span className={`${styles.settingLabel} ${styles.dangerLabel}`}>
-                  {clearing ? 'Clearing Data…' : 'Clear All Data'}
+                  {clearing ? 'Clearing Local Data…' : 'Reset Local Database'}
                 </span>
                 <span className={styles.settingSubtitle}>
-                  Permanently wipe all items, tasks, transactions, and graph links from local storage and remote database
+                  Wipes local device IndexedDB storage without deleting remote cloud backups
                 </span>
               </div>
               <ChevronRight size={14} className={styles.chevron} />
             </button>
+
+            {user && (
+              <button
+                className={styles.actionRow}
+                onClick={handleDeleteAccount}
+                disabled={clearing}
+                id="btn-delete-account-data"
+                style={{ borderTop: '1px solid rgba(239, 68, 68, 0.15)' }}
+              >
+                <Trash2 size={16} style={{ color: '#ef4444' }} />
+                <div className={styles.actionRowInfo}>
+                  <span className={`${styles.settingLabel} ${styles.dangerLabel}`} style={{ color: '#ef4444' }}>
+                    {clearing ? 'Deleting Account…' : 'Delete Account & Cloud Data'}
+                  </span>
+                  <span className={styles.settingSubtitle}>
+                    Permanently delete all personal records from TRACKR Cloud, clear this device, and sign out
+                  </span>
+                </div>
+                <ChevronRight size={14} className={styles.chevron} />
+              </button>
+            )}
           </div>
         </section>
 

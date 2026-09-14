@@ -13,6 +13,7 @@ import { WeeklyDigest } from '@/components/layout/WeeklyDigest';
 export const metadata: Metadata = {
   title: 'TRACKR — Write it. Track it. Link it. Understand it.',
   description: 'Your personal command center. Notes, tasks, trackers, and money — all connected with @references.',
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

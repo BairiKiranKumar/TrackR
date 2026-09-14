@@ -23,4 +23,10 @@ export interface RemoteStorageProvider {
 
   /** Full pull of the current user's item relations. */
   pullRelations(): Promise<ItemRelation[]>;
+
+  /** Remote upsert of finance, inbox, or automation entity */
+  upsertFinanceEntity(entityType: string, payload: unknown): Promise<void>;
+
+  /** Remote deletion of finance, inbox, or automation entity */
+  deleteFinanceEntity(entityType: string, id: string): Promise<void>;
 }

@@ -58,6 +58,9 @@ class MockRemoteProvider implements RemoteStorageProvider {
   async pullRelations(): Promise<ItemRelation[]> {
     return [...this.relations];
   }
+
+  async upsertFinanceEntity(): Promise<void> {}
+  async deleteFinanceEntity(): Promise<void> {}
 }
 
 describe('Phase 0: Foundation & Production Safety', () => {

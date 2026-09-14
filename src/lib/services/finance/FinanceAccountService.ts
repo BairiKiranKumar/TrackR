@@ -6,6 +6,7 @@ import {
   getAllAccounts, getAccountById, saveAccount, deleteAccount,
   getAllTransactions, genFinanceId, queryTransactions,
 } from '@/lib/db/localDb';
+import { syncQueueService } from '../SyncQueueService';
 
 // ─── Finance Account Service ──────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export class FinanceAccountService {
       updatedAt: now,
     };
     await saveAccount(account);
+    await syncQueueService.enqueue('fa_account', account.id, 'upsert', account);
     return account;
   }
 
@@ -66,6 +68,7 @@ export class FinanceAccountService {
       updatedAt: new Date().toISOString(),
     };
     await saveAccount(updated);
+    await syncQueueService.enqueue('fa_account', updated.id, 'upsert', updated);
     return updated;
   }
 
@@ -91,6 +94,7 @@ export class FinanceAccountService {
       };
     }
     await deleteAccount(id);
+    await syncQueueService.enqueue('fa_account', id, 'delete');
     return { success: true };
   }
 

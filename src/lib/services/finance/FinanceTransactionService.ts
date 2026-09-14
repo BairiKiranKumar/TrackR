@@ -7,6 +7,7 @@ import {
   getAccountById, genFinanceId, getAllCategories,
 } from '@/lib/db/localDb';
 import { financeRulesService } from './FinanceRulesService';
+import { syncQueueService } from '../SyncQueueService';
 
 // ─── Finance Transaction Service ───────────────────────────────────────────
 
@@ -112,6 +113,7 @@ export class FinanceTransactionService {
 
     await saveTransaction(withRules);
     await this.updateAccountBalance(withRules.accountId, withRules.type, withRules.amount, 1);
+    await syncQueueService.enqueue('fa_transaction', withRules.id, 'upsert', withRules);
 
     return withRules;
   }
@@ -170,6 +172,8 @@ export class FinanceTransactionService {
 
     await saveTransaction(outgoing);
     await saveTransaction(incoming);
+    await syncQueueService.enqueue('fa_transaction', outgoing.id, 'upsert', outgoing);
+    await syncQueueService.enqueue('fa_transaction', incoming.id, 'upsert', incoming);
 
     // Outgoing: decrease source balance
     await this.applyBalanceDelta(params.fromAccountId, -params.amount);
@@ -197,6 +201,7 @@ export class FinanceTransactionService {
     };
 
     await saveTransaction(updated);
+    await syncQueueService.enqueue('fa_transaction', updated.id, 'upsert', updated);
 
     // Apply new balance effect
     await this.updateAccountBalance(updated.accountId, updated.type, updated.amount, 1);
@@ -221,10 +226,12 @@ export class FinanceTransactionService {
         await this.applyBalanceDelta(pair.accountId, pair.type === 'transfer' && pair.accountId !== existing.accountId
           ? -pair.amount : pair.amount);
         await deleteTransaction(pair.id);
+        await syncQueueService.enqueue('fa_transaction', pair.id, 'delete');
       }
     }
 
     await deleteTransaction(id);
+    await syncQueueService.enqueue('fa_transaction', id, 'delete');
   }
 
   // ── Duplicate ───────────────────────────────────────────────────────

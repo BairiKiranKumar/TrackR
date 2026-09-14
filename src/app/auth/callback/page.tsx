@@ -18,7 +18,9 @@ export default function AuthCallbackPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: { subscription } } = sb.auth.onAuthStateChange((event: string, session: any) => {
-      if (event === 'SIGNED_IN' && session) {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.replace('/auth/reset');
+      } else if (event === 'SIGNED_IN' && session) {
         router.replace('/');
       } else if (event === 'SIGNED_OUT' || !session) {
         router.replace('/auth');
@@ -28,13 +30,17 @@ export default function AuthCallbackPage() {
     // Also try to get session directly
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sb.auth.getSession().then(({ data }: { data: any }) => {
+      if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+        router.replace('/auth/reset');
+        return;
+      }
       if (data.session) {
         router.replace('/');
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   return (
     <div style={{

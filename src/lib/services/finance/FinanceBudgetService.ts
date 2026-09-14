@@ -6,6 +6,7 @@ import {
   queryTransactions, getAllCategories, genFinanceId,
 } from '@/lib/db/localDb';
 import { BudgetPeriodEngine } from './BudgetPeriodEngine';
+import { syncQueueService } from '../SyncQueueService';
 
 export class FinanceBudgetService {
 
@@ -54,6 +55,7 @@ export class FinanceBudgetService {
       updatedAt: now,
     };
     await saveBudget(budget);
+    await syncQueueService.enqueue('fa_budget', budget.id, 'upsert', budget);
     return budget;
   }
 
@@ -68,11 +70,13 @@ export class FinanceBudgetService {
       updatedAt: new Date().toISOString(),
     };
     await saveBudget(updated);
+    await syncQueueService.enqueue('fa_budget', updated.id, 'upsert', updated);
     return updated;
   }
 
   async deleteBudget(id: string): Promise<void> {
     await deleteBudget(id);
+    await syncQueueService.enqueue('fa_budget', id, 'delete');
   }
 
   /**

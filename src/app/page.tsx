@@ -24,6 +24,7 @@ import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Item, TrackerMetadata, TaskMetadata, ProjectMetadata, ProjectContextSummary, AttentionItem } from '@/types';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
+import { ContextualOnboarding } from '@/components/onboarding/ContextualOnboarding';
 import LandingPage from './landing';
 import styles from './page.module.css';
 
@@ -245,6 +246,9 @@ function HomeDashboard() {
           </Link>
         </div>
       )}
+
+      {/* 0B. CONTEXTUAL ONBOARDING (Phase 6A - for new or zero-data users) */}
+      {items.length === 0 && <ContextualOnboarding />}
 
       {/* 1. TODAY */}
       <section className={styles.section}>

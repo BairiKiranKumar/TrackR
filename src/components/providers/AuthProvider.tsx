@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (newUser) {
       syncSessionCookies(newSession);
       await loadUserConfig(newUser.id);
-      const isOnAuth = currentPath.startsWith('/auth');
+      const isOnAuth = currentPath.startsWith('/auth') && !currentPath.startsWith('/auth/reset');
 
       // No database setup step — a signed-in user is immediately usable via
       // TRACKR Cloud. /auth/setup is reached only from Settings → Data &

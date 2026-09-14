@@ -16,6 +16,18 @@ const SENSITIVE_KEY_PATTERNS = [
   /bearer/i,
   /cookie/i,
   /session/i,
+  /payee/i,
+  /description/i,
+  /account_?number/i,
+  /card_?number/i,
+  /iban/i,
+  /cvv/i,
+  /ssn/i,
+  /pan/i,
+  /amount/i,
+  /balance/i,
+  /note/i,
+  /email/i,
 ];
 
 function isSensitiveKey(key: string): boolean {

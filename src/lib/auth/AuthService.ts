@@ -84,6 +84,13 @@ export async function sendPasswordReset(email: string) {
   if (error) throw error;
 }
 
+export async function updatePassword(newPassword: string): Promise<void> {
+  const sb = getMasterSupabase();
+  if (!sb) throw new Error('Master Supabase is not configured.');
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
 // ─── Config check ────────────────────────────────────────────────────────────
 
 export function isSupabaseConfigured(): boolean {
