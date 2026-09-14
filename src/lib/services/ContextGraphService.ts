@@ -16,6 +16,7 @@ import {
 import { syncQueueService } from './SyncQueueService';
 import { financeBudgetService } from './finance/FinanceBudgetService';
 import { financeReportService } from './finance/FinanceReportService';
+import { financialInboxService } from './inbox/FinancialInboxService';
 
 // ─── Unique ID generator ───────────────────────────────────────────────────
 function genId(): string {
@@ -761,6 +762,28 @@ export class ContextGraphService {
           });
         }
       }
+    }
+
+    // 7. Financial Inbox Items Pending Review
+    try {
+      const inboxSummary = await financialInboxService.getPendingSummary();
+      if (inboxSummary.count > 0) {
+        const totalStr = inboxSummary.totalAmount > 0
+          ? ` (₹${inboxSummary.totalAmount.toLocaleString('en-IN')})`
+          : '';
+        attention.push({
+          id: 'attn-financial-inbox',
+          type: 'financial_inbox',
+          title: 'Financial Inbox',
+          message: `${inboxSummary.count} financial item${inboxSummary.count === 1 ? '' : 's'}${totalStr} need review.`,
+          severity: inboxSummary.count >= 5 ? 'urgent' : 'warning',
+          entityId: 'financial_inbox',
+          entityType: 'financial_inbox',
+          actionUrl: '/money/inbox',
+        });
+      }
+    } catch {
+      // In case inbox tables or service isn't initialized yet
     }
 
     return attention;

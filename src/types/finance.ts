@@ -49,7 +49,7 @@ export interface FinanceTransaction {
   labels: string[];         // label ids
   projectId?: string;       // link to Universal Item project
   goalId?: string;          // link to Universal Item goal
-  source?: 'manual' | 'csv_import' | 'recurring';
+  source?: 'manual' | 'csv_import' | 'recurring' | 'financial_inbox';
   sourceReference?: string; // e.g. CSV filename, recurringId
   recurringId?: string;     // link to FinancePlannedPayment
   transferId?: string;      // pairs two transfer transactions
@@ -126,6 +126,15 @@ export interface FinanceBudgetProgress {
   remaining: number;
   percentage: number;
   projectedSpend: number;
+  potentialOverspend?: number;
+  daysRemaining?: number;
+  daysTotal?: number;
+  daysElapsed?: number;
+  dailyRate?: number;
+  rolloverAmount?: number;
+  effectiveTarget?: number;
+  periodStart?: string;
+  periodEnd?: string;
   isAlert: boolean;
   isOver: boolean;
 }
@@ -396,9 +405,10 @@ export interface FinanceExportPayload {
   investments: FinanceInvestment[];
   debts: FinanceDebt[];
   currencyRates: CurrencyRate[];
+  candidates?: FinancialCandidate[];
 }
 
-export const FINANCE_EXPORT_VERSION = 1;
+export const FINANCE_EXPORT_VERSION = 2;
 
 // ─── Default Category Seed Data ───────────────────────────────────────────────
 
@@ -554,10 +564,12 @@ export function getPeriodDateRange(period: BudgetPeriod, referenceDate = new Dat
 
   switch (period) {
     case 'weekly': {
-      const dow = referenceDate.getDay(); // 0 = Sun
-      const start = new Date(y, m, d - dow);
-      const end = new Date(y, m, d - dow + 6);
-      return { start: fmt(start), end: fmt(end) };
+      // ISO 8601 week: Monday (1) to Sunday (7 / 0 in JS Date)
+      const dayOfWeek = referenceDate.getDay();
+      const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+      const monday = new Date(y, m, d + diffToMonday);
+      const sunday = new Date(y, m, d + diffToMonday + 6);
+      return { start: fmt(monday), end: fmt(sunday) };
     }
     case 'monthly':
       return {
@@ -572,4 +584,41 @@ export function getPeriodDateRange(period: BudgetPeriod, referenceDate = new Dat
     case 'custom':
       return { start: fmt(referenceDate), end: fmt(referenceDate) };
   }
+}
+
+// ─── Financial Inbox Candidates ──────────────────────────────────────────────
+
+export type FinancialCandidateSource =
+  | 'manual'
+  | 'csv'
+  | 'gmail'
+  | 'bank'
+  | 'sms'
+  | 'notification'
+  | 'import';
+
+export type FinancialCandidateStatus = 'pending' | 'accepted' | 'rejected' | 'ignored';
+
+export interface FinancialCandidate {
+  id: string;
+  source: FinancialCandidateSource;
+  detectedAt: string;
+  amount: number;
+  currency: string;
+  payee: string;
+  date: string;
+  suggestedCategory?: string;
+  suggestedAccount?: string;
+  suggestedProject?: string;
+  suggestedGoal?: string;
+  suggestedLabels?: string[];
+  confidence?: number;
+  reason?: string;
+  sourceReference?: string;
+  status: FinancialCandidateStatus;
+  duplicateOf?: string; // id of existing transaction or candidate
+  transactionId?: string; // created transaction if accepted
+  rawPayload?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }

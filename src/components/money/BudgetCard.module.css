@@ -120,3 +120,47 @@
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
+
+.rolloverRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.rolloverPositive {
+  color: var(--color-success, #10b981);
+  font-weight: 500;
+}
+
+.rolloverNegative {
+  color: var(--color-danger, #ef4444);
+  font-weight: 500;
+}
+
+.forecastRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.6875rem;
+  padding-top: var(--space-1);
+  border-top: 1px dashed var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.forecastBadge {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg-surface-elevated);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.overspendWarn {
+  color: var(--color-danger);
+  font-weight: 600;
+}

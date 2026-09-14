@@ -7,6 +7,7 @@ import {
   getAllFinanceData,
 } from '@/lib/db/localDb';
 import { financeTransactionService } from './FinanceTransactionService';
+import { financialInboxService } from '../inbox/FinancialInboxService';
 
 export class FinanceCsvService {
 
@@ -163,7 +164,11 @@ export class FinanceCsvService {
   async importRows(
     rows: CsvImportRow[],
     accountId: string,
-    options: { skipDuplicates: boolean; categoryMap?: Record<string, string> }
+    options: {
+      skipDuplicates: boolean;
+      categoryMap?: Record<string, string>;
+      routeAmbiguousToInbox?: boolean;
+    }
   ): Promise<CsvImportResult> {
     let imported = 0;
     let skipped = 0;
@@ -179,7 +184,22 @@ export class FinanceCsvService {
 
       if (row.isDuplicate) {
         duplicatesFound++;
-        if (options.skipDuplicates) {
+        if (options.routeAmbiguousToInbox) {
+          await financialInboxService.createCandidate({
+            source: 'csv',
+            amount: row.parsed.amount || 0,
+            currency: row.parsed.currency || DEFAULT_CURRENCY,
+            payee: row.parsed.payee || 'Unknown Payee',
+            date: row.parsed.date || new Date().toISOString().slice(0, 10),
+            suggestedAccount: accountId,
+            suggestedCategory: row.parsed.categoryName ? options.categoryMap?.[row.parsed.categoryName] : undefined,
+            duplicateOf: row.duplicateOf,
+            reason: 'Possible duplicate transaction detected during CSV import',
+            rawPayload: row.rawRow,
+          });
+          skipped++;
+          continue;
+        } else if (options.skipDuplicates) {
           skipped++;
           continue;
         }

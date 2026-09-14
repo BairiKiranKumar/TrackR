@@ -6,7 +6,7 @@ import {
   Moon, Sun, Cloud, RefreshCw,
   Download, Upload, ChevronRight, LogOut, Trash2,
   Package, CheckCircle2, AlertCircle, Settings2,
-  Lock, Zap, Plug,
+  Lock, Zap, Plug, Sliders,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -16,6 +16,7 @@ import { dataService } from '@/lib/services/DataService';
 import { storageModeService } from '@/lib/services/StorageModeService';
 import { StorageMode } from '@/types';
 import { Button, Badge } from '@/components/ui';
+import { AutomationSettings } from '@/components/settings/AutomationSettings';
 import styles from './page.module.css';
 
 export default function SettingsPage() {
@@ -36,6 +37,13 @@ export default function SettingsPage() {
   const [switchTarget, setSwitchTarget] = useState<StorageMode | null>(null);
   const [migrating, setMigrating] = useState(false);
   const [migrationDone, setMigrationDone] = useState(false);
+  const [activeTab, setActiveTab] = useState<'general' | 'automation'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'automation') return 'automation';
+    }
+    return 'general';
+  });
 
   useEffect(() => {
     let active = true;
@@ -168,10 +176,32 @@ export default function SettingsPage() {
     <div className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Settings</h1>
-        <p className={styles.subtitle}>System preferences, data storage, sync controls, and privacy.</p>
+        <p className={styles.subtitle}>System preferences, deterministic automation, data storage, and privacy.</p>
       </div>
 
-      <div className={styles.sectionsList}>
+      {/* Tabs Switcher */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px', marginBottom: '24px' }}>
+        <button
+          className={`btn ${activeTab === 'general' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+          onClick={() => setActiveTab('general')}
+          id="tab-btn-settings-general"
+        >
+          General & Storage
+        </button>
+        <button
+          className={`btn ${activeTab === 'automation' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+          onClick={() => setActiveTab('automation')}
+          id="tab-btn-settings-automation"
+        >
+          <Sliders size={14} style={{ marginRight: 6 }} />
+          Automation Rules
+        </button>
+      </div>
+
+      {activeTab === 'automation' ? (
+        <AutomationSettings />
+      ) : (
+        <div className={styles.sectionsList}>
         {/* 1. Account */}
         {user && (
           <section className={styles.section}>
@@ -528,6 +558,7 @@ export default function SettingsPage() {
           <span className={styles.version}>v1.0.0 · Local-first architecture</span>
         </section>
       </div>
+      )}
     </div>
   );
 }

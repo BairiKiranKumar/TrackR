@@ -15,6 +15,7 @@ import {
   Sliders,
   UploadCloud,
   ArrowRight,
+  Inbox,
 } from 'lucide-react';
 import {
   FinanceAccount,
@@ -29,6 +30,7 @@ import { financeTransactionService } from '@/lib/services/finance/FinanceTransac
 import { financeCategoryService } from '@/lib/services/finance/FinanceCategoryService';
 import { financeBudgetService } from '@/lib/services/finance/FinanceBudgetService';
 import { financePlannedService } from '@/lib/services/finance/FinancePlannedService';
+import { financialInboxService } from '@/lib/services/inbox/FinancialInboxService';
 import { NetWorthCard } from '@/components/money/NetWorthCard';
 import { AccountCard } from '@/components/money/AccountCard';
 import { BudgetCard } from '@/components/money/BudgetCard';
@@ -52,6 +54,7 @@ export default function MoneyPage() {
     { date: string; label: string; amount: number; type: 'planned' | 'projected'; paymentId: string }[]
   >([]);
   const [netWorthData, setNetWorthData] = useState({ totalAssets: 0, totalLiabilities: 0, netWorth: 0 });
+  const [pendingInboxCount, setPendingInboxCount] = useState<number>(0);
 
   // Modals state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -72,13 +75,14 @@ export default function MoneyPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [accs, txns, cats, bds, fc, nw] = await Promise.all([
+      const [accs, txns, cats, bds, fc, nw, inboxSum] = await Promise.all([
         financeAccountService.getActiveAccounts(),
         financeTransactionService.getAllTransactions(),
         financeCategoryService.getAllCategories(),
         financeBudgetService.getAllBudgetProgress(),
         financePlannedService.generateForecast(60),
         financeAccountService.getNetWorthBreakdown(),
+        financialInboxService.getPendingSummary().catch(() => ({ count: 0 })),
       ]);
 
       setAccounts(accs);
@@ -86,6 +90,7 @@ export default function MoneyPage() {
       setCategories(cats);
       setBudgets(bds);
       setForecast(fc);
+      setPendingInboxCount(inboxSum.count);
       setNetWorthData({
         totalAssets: nw.totalAssets,
         totalLiabilities: nw.totalLiabilities,
@@ -206,6 +211,15 @@ export default function MoneyPage() {
 
       {/* Sub-nav quick links to deeper features */}
       <div className={styles.subnav}>
+        <Link href="/money/inbox" className={styles.subnavLink} id="link-finance-inbox">
+          <Inbox size={14} />
+          <span>Financial Inbox</span>
+          {pendingInboxCount > 0 && (
+            <span className="badge badge-primary" style={{ padding: '1px 6px', fontSize: '11px', marginLeft: 4 }}>
+              {pendingInboxCount}
+            </span>
+          )}
+        </Link>
         <Link href="/money/reports" className={styles.subnavLink} id="link-finance-reports">
           <BarChart3 size={14} />
           <span>Reports</span>

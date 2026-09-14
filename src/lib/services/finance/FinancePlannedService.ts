@@ -1,9 +1,13 @@
 import { FinancePlannedPayment, FinanceTransaction, Recurrence, DEFAULT_CURRENCY } from '@/types/finance';
 import {
   getAllPlannedPayments, getPlannedPaymentById, savePlannedPayment, deletePlannedPayment,
-  genFinanceId,
+  queryTransactions, genFinanceId,
 } from '@/lib/db/localDb';
 import { financeTransactionService } from './FinanceTransactionService';
+
+function toLocalDateString(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export class FinancePlannedService {
 
@@ -67,14 +71,39 @@ export class FinancePlannedService {
     await deletePlannedPayment(id);
   }
 
-  /** Confirm a planned payment: creates an actual transaction */
-  async confirmPayment(id: string, overrides?: Partial<Pick<FinancePlannedPayment, 'amount' | 'accountId' | 'categoryId' | 'note'>>): Promise<FinanceTransaction | null> {
+  /** Stable recurrence identity for an occurrence */
+  generateOccurrenceId(paymentId: string, dueDate: string): string {
+    return `rec_${paymentId}_${dueDate.slice(0, 10)}`;
+  }
+
+  /** Check if an occurrence has already been generated as a transaction */
+  async hasOccurrenceBeenGenerated(paymentId: string, dueDate: string): Promise<boolean> {
+    const occId = this.generateOccurrenceId(paymentId, dueDate);
+    const existing = await queryTransactions({ recurringId: paymentId });
+    return existing.some(t => t.sourceReference === occId || t.date === dueDate.slice(0, 10));
+  }
+
+  /** Confirm a planned payment: creates an actual transaction with stable recurrence identity */
+  async confirmPayment(
+    id: string,
+    overrides?: Partial<Pick<FinancePlannedPayment, 'amount' | 'accountId' | 'categoryId' | 'note'>> & { date?: string }
+  ): Promise<FinanceTransaction | null> {
     const payment = await getPlannedPaymentById(id);
     if (!payment || !payment.accountId) return null;
 
+    const targetDate = overrides?.date ?? payment.dueDate;
+    const occId = this.generateOccurrenceId(payment.id, targetDate);
+    const alreadyGenerated = await this.hasOccurrenceBeenGenerated(payment.id, targetDate);
+    if (alreadyGenerated) {
+      // Find and return existing transaction without creating duplicate
+      const txns = await queryTransactions({ recurringId: payment.id });
+      const existing = txns.find(t => t.sourceReference === occId || t.date === targetDate.slice(0, 10));
+      if (existing) return existing;
+    }
+
     const transaction = await financeTransactionService.createTransaction({
       accountId: overrides?.accountId ?? payment.accountId,
-      date: payment.dueDate,
+      date: targetDate,
       amount: overrides?.amount ?? payment.amount,
       currency: payment.currency,
       type: 'expense',
@@ -82,12 +111,12 @@ export class FinancePlannedService {
       payee: payment.payee,
       note: overrides?.note ?? payment.note,
       source: 'recurring',
-      sourceReference: payment.id,
+      sourceReference: occId,
       recurringId: payment.id,
     });
 
     // Advance due date for recurring payments
-    const nextDueDate = this.computeNextDueDate(payment.dueDate, payment.recurrence);
+    const nextDueDate = this.computeNextDueDate(targetDate, payment.recurrence);
     const newStatus = payment.recurrence.frequency === 'once' ? 'paid' : 'pending';
 
     await savePlannedPayment({
@@ -99,6 +128,71 @@ export class FinancePlannedService {
     });
 
     return transaction;
+  }
+
+  /**
+   * Deterministic recurrence engine:
+   * 1. Evaluates all active planned payments.
+   * 2. If autoCreate is true and payment is due on or before referenceDate:
+   *    Checks if occurrence was already generated.
+   *    If not, creates the transaction, logs occurrenceId, advances dueDate.
+   * 3. If autoCreate is false (default):
+   *    Generates an upcoming reminder (due in N days) for Attention/UI.
+   *    Never silently debits or creates real transactions without user confirmation.
+   */
+  async processRecurrenceEngine(referenceDate = new Date()): Promise<{
+    generatedTransactions: FinanceTransaction[];
+    upcomingReminders: { payment: FinancePlannedPayment; daysRemaining: number }[];
+  }> {
+    const today = toLocalDateString(referenceDate);
+    const payments = await this.getActivePlannedPayments();
+    const generatedTransactions: FinanceTransaction[] = [];
+    const upcomingReminders: { payment: FinancePlannedPayment; daysRemaining: number }[] = [];
+
+    for (const payment of payments) {
+      if (payment.status !== 'pending' || !payment.dueDate) continue;
+
+      const dueDay = payment.dueDate.slice(0, 10);
+      const diffDays = Math.ceil((new Date(dueDay).getTime() - new Date(today).getTime()) / 86400000);
+
+      // Auto-create only when explicitly enabled and due on or before reference date
+      if (payment.autoCreate && dueDay <= today) {
+        const alreadyGenerated = await this.hasOccurrenceBeenGenerated(payment.id, dueDay);
+        if (!alreadyGenerated && payment.accountId) {
+          const occId = this.generateOccurrenceId(payment.id, dueDay);
+          const txn = await financeTransactionService.createTransaction({
+            accountId: payment.accountId,
+            date: dueDay,
+            amount: payment.amount,
+            currency: payment.currency,
+            type: 'expense',
+            categoryId: payment.categoryId,
+            payee: payment.payee,
+            note: payment.note,
+            source: 'recurring',
+            sourceReference: occId,
+            recurringId: payment.id,
+          });
+
+          generatedTransactions.push(txn);
+
+          const nextDueDate = this.computeNextDueDate(payment.dueDate, payment.recurrence);
+          const newStatus = payment.recurrence.frequency === 'once' ? 'paid' : 'pending';
+
+          await savePlannedPayment({
+            ...payment,
+            dueDate: nextDueDate ?? payment.dueDate,
+            status: newStatus,
+            lastTransactionId: txn.id,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } else if (diffDays >= 0 && diffDays <= (payment.reminderDays ?? 3)) {
+        upcomingReminders.push({ payment, daysRemaining: diffDays });
+      }
+    }
+
+    return { generatedTransactions, upcomingReminders };
   }
 
   /** Skip a planned payment occurrence */
@@ -152,7 +246,8 @@ export class FinancePlannedService {
   private computeNextDueDate(currentDue: string, recurrence: Recurrence): string | null {
     if (recurrence.frequency === 'once') return null;
 
-    const date = new Date(currentDue);
+    const [y, m, d] = currentDue.slice(0, 10).split('-').map(Number);
+    const date = new Date(y, m - 1, d);
     const interval = recurrence.interval ?? 1;
 
     switch (recurrence.frequency) {
@@ -163,7 +258,7 @@ export class FinancePlannedService {
       case 'custom': date.setDate(date.getDate() + interval); break;
     }
 
-    const next = date.toISOString().slice(0, 10);
+    const next = toLocalDateString(date);
 
     // Check if we've exceeded max occurrences / end date
     if (recurrence.endDate && next > recurrence.endDate) return null;

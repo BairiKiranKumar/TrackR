@@ -13,3 +13,4 @@ export { financeInvestmentService, FinanceInvestmentService } from './FinanceInv
 export { financeDebtService, FinanceDebtService } from './FinanceDebtService';
 export { financeReportService, FinanceReportService } from './FinanceReportService';
 export { financeCsvService, FinanceCsvService } from './FinanceCsvService';
+export { BudgetPeriodEngine } from './BudgetPeriodEngine';

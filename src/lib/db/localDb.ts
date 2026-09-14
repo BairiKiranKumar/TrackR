@@ -4,7 +4,9 @@ import {
   FinanceAccount, FinanceTransaction, FinanceCategory, FinanceLabel,
   FinanceBudget, FinanceRule, FinancePlannedPayment, FinanceInvestment,
   FinanceDebt, CurrencyRate, DEFAULT_CATEGORIES, DEFAULT_CURRENCY,
+  FinancialCandidate, FinancialCandidateStatus, FinancialCandidateSource,
 } from '@/types/finance';
+import { AutomationRule, AutomationExecution } from '@/types/automation';
 
 // ─── DB Schema ─────────────────────────────────────────────────────────────
 
@@ -138,12 +140,40 @@ interface TrackrDB extends DBSchema {
       'by-from': string;
     };
   };
+  // ─── Phase 5 Automation & Inbox stores (v6) ────────────────────────
+  fa_inbox: {
+    key: string;
+    value: FinancialCandidate;
+    indexes: {
+      'by-status': string;
+      'by-source': string;
+      'by-date': string;
+      'by-createdAt': string;
+    };
+  };
+  fa_automations: {
+    key: string;
+    value: AutomationRule;
+    indexes: {
+      'by-trigger': string;
+      'by-priority': number;
+    };
+  };
+  fa_automation_history: {
+    key: string;
+    value: AutomationExecution;
+    indexes: {
+      'by-ruleId': string;
+      'by-targetEntityId': string;
+      'by-executedAt': string;
+    };
+  };
 }
 
 // ─── DB Instance ───────────────────────────────────────────────────────────
 
 const DB_NAME = 'trackr-db';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbPromise: Promise<IDBPDatabase<TrackrDB>> | null = null;
 
@@ -252,6 +282,28 @@ export function getDb(): Promise<IDBPDatabase<TrackrDB>> {
           // Currency rates
           const ratesStore = db.createObjectStore('fa_currency_rates', { keyPath: 'id' });
           ratesStore.createIndex('by-from', 'from');
+        }
+
+        // ── v6 automation & inbox stores ──────────────────────────────────
+        if (oldVersion < 6) {
+          if (!db.objectStoreNames.contains('fa_inbox')) {
+            const inboxStore = db.createObjectStore('fa_inbox', { keyPath: 'id' });
+            inboxStore.createIndex('by-status', 'status');
+            inboxStore.createIndex('by-source', 'source');
+            inboxStore.createIndex('by-date', 'date');
+            inboxStore.createIndex('by-createdAt', 'createdAt');
+          }
+          if (!db.objectStoreNames.contains('fa_automations')) {
+            const autoStore = db.createObjectStore('fa_automations', { keyPath: 'id' });
+            autoStore.createIndex('by-trigger', 'trigger');
+            autoStore.createIndex('by-priority', 'priority');
+          }
+          if (!db.objectStoreNames.contains('fa_automation_history')) {
+            const histStore = db.createObjectStore('fa_automation_history', { keyPath: 'id' });
+            histStore.createIndex('by-ruleId', 'ruleId');
+            histStore.createIndex('by-targetEntityId', 'targetEntityId');
+            histStore.createIndex('by-executedAt', 'executedAt');
+          }
         }
       },
 
@@ -390,7 +442,7 @@ export async function clearAllData(): Promise<void> {
     'items', 'item_relations', 'activity_events', 'sync_queue',
     'fa_accounts', 'fa_transactions', 'fa_categories', 'fa_labels',
     'fa_budgets', 'fa_rules', 'fa_planned', 'fa_investments',
-    'fa_debts', 'fa_currency_rates',
+    'fa_debts', 'fa_currency_rates', 'fa_inbox', 'fa_automations', 'fa_automation_history',
   ];
   if (db.objectStoreNames.contains('diagnostic_events')) {
     storesToClear.push('diagnostic_events');
@@ -478,6 +530,7 @@ export interface TransactionFilter {
   projectId?: string;
   goalId?: string;
   labelId?: string;
+  recurringId?: string;
   payeeContains?: string;
   noteContains?: string;
   dateStart?: string;
@@ -491,7 +544,9 @@ export async function queryTransactions(filter: TransactionFilter): Promise<Fina
   let results: FinanceTransaction[];
 
   // Use the most selective index available
-  if (filter.accountId) {
+  if (filter.recurringId) {
+    results = await db.getAllFromIndex('fa_transactions', 'by-recurringId', filter.recurringId);
+  } else if (filter.accountId) {
     results = await db.getAllFromIndex('fa_transactions', 'by-accountId', filter.accountId);
   } else if (filter.type) {
     results = await db.getAllFromIndex('fa_transactions', 'by-type', filter.type);
@@ -702,7 +757,7 @@ export async function getLatestRate(from: string, to: string): Promise<CurrencyR
 
 export async function getAllFinanceData() {
   const db = await getDb();
-  const [accounts, transactions, categories, labels, budgets, rules, planned, investments, debts, currencyRates] = await Promise.all([
+  const [accounts, transactions, categories, labels, budgets, rules, planned, investments, debts, currencyRates, candidates, automationRules, automationExecutions] = await Promise.all([
     db.getAll('fa_accounts'),
     db.getAll('fa_transactions'),
     db.getAll('fa_categories'),
@@ -713,8 +768,25 @@ export async function getAllFinanceData() {
     db.getAll('fa_investments'),
     db.getAll('fa_debts'),
     db.getAll('fa_currency_rates'),
+    db.getAll('fa_inbox'),
+    db.getAll('fa_automations'),
+    db.getAll('fa_automation_history'),
   ]);
-  return { accounts, transactions, categories, labels, budgets, rules, plannedPayments: planned, investments, debts, currencyRates };
+  return {
+    accounts,
+    transactions,
+    categories,
+    labels,
+    budgets,
+    rules,
+    plannedPayments: planned,
+    investments,
+    debts,
+    currencyRates,
+    candidates,
+    automationRules,
+    automationExecutions,
+  };
 }
 
 export async function importFinanceData(data: {
@@ -728,6 +800,9 @@ export async function importFinanceData(data: {
   investments?: FinanceInvestment[];
   debts?: FinanceDebt[];
   currencyRates?: CurrencyRate[];
+  candidates?: FinancialCandidate[];
+  automationRules?: AutomationRule[];
+  automationExecutions?: AutomationExecution[];
 }): Promise<void> {
   const db = await getDb();
   const stores = [
@@ -741,6 +816,9 @@ export async function importFinanceData(data: {
     ['fa_investments', data.investments ?? []],
     ['fa_debts', data.debts ?? []],
     ['fa_currency_rates', data.currencyRates ?? []],
+    ['fa_inbox', data.candidates ?? []],
+    ['fa_automations', data.automationRules ?? []],
+    ['fa_automation_history', data.automationExecutions ?? []],
   ] as const;
 
   for (const [storeName, items] of stores) {
@@ -749,6 +827,90 @@ export async function importFinanceData(data: {
     }
   }
 }
+
+// ─── Financial Inbox Candidates CRUD ─────────────────────────────────────────
+
+export async function getAllCandidates(): Promise<FinancialCandidate[]> {
+  const db = await getDb();
+  return db.getAll('fa_inbox');
+}
+
+export async function getCandidateById(id: string): Promise<FinancialCandidate | undefined> {
+  const db = await getDb();
+  return db.get('fa_inbox', id);
+}
+
+export async function saveCandidate(candidate: FinancialCandidate): Promise<void> {
+  const db = await getDb();
+  await db.put('fa_inbox', candidate);
+}
+
+export async function deleteCandidate(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete('fa_inbox', id);
+}
+
+export async function queryCandidates(filter?: {
+  status?: FinancialCandidateStatus;
+  source?: FinancialCandidateSource;
+}): Promise<FinancialCandidate[]> {
+  const db = await getDb();
+  let candidates: FinancialCandidate[];
+  if (filter?.status) {
+    candidates = await db.getAllFromIndex('fa_inbox', 'by-status', filter.status);
+  } else if (filter?.source) {
+    candidates = await db.getAllFromIndex('fa_inbox', 'by-source', filter.source);
+  } else {
+    candidates = await db.getAll('fa_inbox');
+  }
+
+  if (filter?.source && filter?.status) {
+    candidates = candidates.filter(c => c.source === filter.source);
+  }
+
+  return candidates.sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+}
+
+// ─── Generic Automation Rules & Executions CRUD ──────────────────────────────
+
+export async function getAllAutomationRules(): Promise<AutomationRule[]> {
+  const db = await getDb();
+  const rules = await db.getAll('fa_automations');
+  return rules.sort((a, b) => b.priority - a.priority || a.createdAt.localeCompare(b.createdAt));
+}
+
+export async function getAutomationRuleById(id: string): Promise<AutomationRule | undefined> {
+  const db = await getDb();
+  return db.get('fa_automations', id);
+}
+
+export async function saveAutomationRule(rule: AutomationRule): Promise<void> {
+  const db = await getDb();
+  await db.put('fa_automations', rule);
+}
+
+export async function deleteAutomationRule(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete('fa_automations', id);
+}
+
+export async function saveAutomationExecution(exec: AutomationExecution): Promise<void> {
+  const db = await getDb();
+  await db.put('fa_automation_history', exec);
+}
+
+export async function getExecutionsForEntity(targetEntityId: string): Promise<AutomationExecution[]> {
+  const db = await getDb();
+  const all = await db.getAllFromIndex('fa_automation_history', 'by-targetEntityId', targetEntityId);
+  return all.sort((a, b) => b.executedAt.localeCompare(a.executedAt));
+}
+
+export async function getAllAutomationExecutions(limit = 100): Promise<AutomationExecution[]> {
+  const db = await getDb();
+  const all = await db.getAll('fa_automation_history');
+  return all.sort((a, b) => b.executedAt.localeCompare(a.executedAt)).slice(0, limit);
+}
+
 
 // ─── Finance-aware search ──────────────────────────────────────────────────
 

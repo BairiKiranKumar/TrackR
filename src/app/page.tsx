@@ -15,9 +15,11 @@ import {
   Edit3,
   ArrowRight,
   AlertTriangle,
+  Receipt,
 } from 'lucide-react';
 import { dataService } from '@/lib/services/DataService';
 import { contextGraphService } from '@/lib/services/ContextGraphService';
+import { financialInboxService } from '@/lib/services/inbox/FinancialInboxService';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { Item, TrackerMetadata, TaskMetadata, ProjectMetadata, ProjectContextSummary, AttentionItem } from '@/types';
@@ -50,6 +52,7 @@ function HomeDashboard() {
   const [recentActivity, setRecentActivity] = useState<{ id: string; description: string; type: string; time: string }[]>([]);
   const [attentionItems, setAttentionItems] = useState<AttentionItem[]>([]);
   const [goalProgresses, setGoalProgresses] = useState<Record<string, { percentage: number; label: string }>>({});
+  const [financialInboxSummary, setFinancialInboxSummary] = useState<{ count: number; totalAmount: number; currency: string } | null>(null);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -88,16 +91,18 @@ function HomeDashboard() {
     let active = true;
 
     async function load() {
-      const [tasks, totals, activity, attention] = await Promise.all([
+      const [tasks, totals, activity, attention, inboxSum] = await Promise.all([
         dataService.getTodayTasks(),
         dataService.getMonthlyTotals(),
         dataService.getRecentActivity(10),
         contextGraphService.getAttentionItems(),
+        financialInboxService.getPendingSummary().catch(() => null),
       ]);
       if (!active) return;
       setTodayTasks(tasks.slice(0, 5));
       setMonthlyTotals(totals);
       setAttentionItems(attention);
+      if (inboxSum) setFinancialInboxSummary(inboxSum);
 
       const actItems = activity.slice(0, 6).map(a => ({
         id: a.id,
@@ -209,6 +214,33 @@ function HomeDashboard() {
           </div>
           <Link href="/inbox" className={styles.inboxBannerBtn} id="link-today-inbox-triage">
             <span>Triage</span>
+            <ChevronRight size={14} />
+          </Link>
+        </div>
+      )}
+
+      {/* Financial Inbox Review Prompt (Only shown when non-empty) */}
+      {financialInboxSummary && financialInboxSummary.count > 0 && (
+        <div className={styles.inboxBanner} id="overview-financial-inbox-card" style={{ borderColor: 'var(--accent-primary)', marginBottom: 'var(--space-6)' }}>
+          <div className={styles.inboxBannerLeft}>
+            <span className={styles.inboxBannerBadge} style={{ background: 'var(--accent-primary)' }}>
+              {financialInboxSummary.count}
+            </span>
+            <div className={styles.inboxBannerText}>
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Receipt size={14} />
+                Financial Inbox
+              </strong>
+              <p>
+                {financialInboxSummary.count} transaction{financialInboxSummary.count > 1 ? 's' : ''} need review
+                {financialInboxSummary.totalAmount > 0
+                  ? ` · ₹${financialInboxSummary.totalAmount.toLocaleString('en-IN')} total`
+                  : ''}
+              </p>
+            </div>
+          </div>
+          <Link href="/money/inbox" className={styles.inboxBannerBtn} id="btn-overview-review-financial-inbox">
+            <span>Review</span>
             <ChevronRight size={14} />
           </Link>
         </div>

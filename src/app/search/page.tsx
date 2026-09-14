@@ -7,6 +7,7 @@ import { Search as SearchIcon, X, SlidersHorizontal, Layers, ChevronDown, Chevro
 import { dataService } from '@/lib/services/DataService';
 import { financeCategoryService } from '@/lib/services/finance/FinanceCategoryService';
 import { Item, ITEM_TYPE_LABELS } from '@/types';
+import { FinancialCandidate } from '@/types/automation';
 import { ItemTypeBadge } from '@/components/common/ItemTypeBadge';
 import { formatAmount } from '@/lib/services/MoneyDetectionService';
 import { ContextPanel } from '@/components/context/ContextPanel';
@@ -41,6 +42,7 @@ function SearchContent() {
       goalId?: string;
     }[]
   >([]);
+  const [inboxCandidates, setInboxCandidates] = useState<FinancialCandidate[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
@@ -83,6 +85,7 @@ function SearchContent() {
     if (!q.trim()) {
       setResults([]);
       setTransactions([]);
+      setInboxCandidates([]);
       setSearched(false);
       return;
     }
@@ -91,6 +94,7 @@ function SearchContent() {
     const r = await dataService.searchWithFinance(q.trim());
     setResults(r.items);
     setTransactions(r.transactions);
+    setInboxCandidates(r.inboxCandidates || []);
     setLoading(false);
   }, []);
 
@@ -412,7 +416,7 @@ function SearchContent() {
       )}
 
       {/* No results */}
-      {!loading && searched && filteredResults.length === 0 && filteredTransactions.length === 0 && (
+      {!loading && searched && filteredResults.length === 0 && filteredTransactions.length === 0 && inboxCandidates.length === 0 && (
         <div className="empty-state">
           <span className="empty-state__icon"><SearchIcon size={36} /></span>
           <span className="empty-state__title">No results for &ldquo;{query}&rdquo;</span>
@@ -421,10 +425,10 @@ function SearchContent() {
       )}
 
       {/* Results grouped by type */}
-      {!loading && (filteredResults.length > 0 || filteredTransactions.length > 0) && (
+      {!loading && (filteredResults.length > 0 || filteredTransactions.length > 0 || inboxCandidates.length > 0) && (
         <div className={styles.results}>
           <p className={styles.resultCount}>
-            {filteredResults.length + filteredTransactions.length} result{filteredResults.length + filteredTransactions.length !== 1 ? 's' : ''}
+            {filteredResults.length + filteredTransactions.length + inboxCandidates.length} result{filteredResults.length + filteredTransactions.length + inboxCandidates.length !== 1 ? 's' : ''}
           </p>
 
           {/* Transactions Group */}
@@ -481,6 +485,47 @@ function SearchContent() {
                         />
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Financial Inbox Candidates Group */}
+          {inboxCandidates.length > 0 && (
+            <div className={styles.group} id="search-group-financial-inbox">
+              <div className="section-header">
+                <span className="section-title">FINANCIAL INBOX (PENDING REVIEW)</span>
+                <span className={styles.groupCount}>{inboxCandidates.length}</span>
+              </div>
+              <div className={styles.groupList}>
+                {inboxCandidates.map(c => (
+                  <div key={c.id} className={styles.resultCardWrapper}>
+                    <div className={styles.resultTopRow}>
+                      <Link
+                        href="/money/inbox"
+                        className={styles.resultMainLink}
+                        id={`link-result-cand-${c.id}`}
+                      >
+                        <span className="badge badge-warning" style={{ textTransform: 'capitalize' }}>
+                          Inbox Candidate
+                        </span>
+                        <div className={styles.resultInfo}>
+                          <div className={styles.resultTitleRow}>
+                            <span className={styles.resultTitle}>
+                              <Highlight text={c.payee || 'Unknown Payee'} query={query} />
+                            </span>
+                            <span className="financial-value" style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                              ₹{c.amount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className={styles.resultSnippet}>
+                            {c.suggestedCategory ? `Suggested: ${c.suggestedCategory} • ` : ''}
+                            Source: {c.source} • {c.date}
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
                   </div>
                 ))}
               </div>

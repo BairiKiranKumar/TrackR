@@ -1,11 +1,11 @@
 import {
-  FinanceBudget, FinanceBudgetProgress, BudgetPeriod,
-  getPeriodDateRange, DEFAULT_CURRENCY,
+  FinanceBudget, FinanceBudgetProgress, BudgetPeriod, DEFAULT_CURRENCY,
 } from '@/types/finance';
 import {
   getAllBudgets, getBudgetById, saveBudget, deleteBudget,
   queryTransactions, getAllCategories, genFinanceId,
 } from '@/lib/db/localDb';
+import { BudgetPeriodEngine } from './BudgetPeriodEngine';
 
 export class FinanceBudgetService {
 
@@ -77,19 +77,23 @@ export class FinanceBudgetService {
 
   /**
    * Calculate real budget progress from actual transactions.
+   * Uses deterministic multi-period bounds, rollover where enabled, and spending forecast.
    * Never uses fake percentages — always derived from transaction data.
    */
   async getBudgetProgress(budgetId: string, referenceDate = new Date()): Promise<FinanceBudgetProgress | null> {
     const budget = await getBudgetById(budgetId);
     if (!budget) return null;
 
-    const { start, end } = budget.period === 'custom'
-      ? { start: budget.startDate, end: budget.endDate ?? budget.startDate }
-      : getPeriodDateRange(budget.period, referenceDate);
+    const bounds = BudgetPeriodEngine.getPeriodBounds(
+      budget.period,
+      referenceDate,
+      budget.startDate,
+      budget.endDate
+    );
 
     const filter: Parameters<typeof queryTransactions>[0] = {
-      dateStart: start,
-      dateEnd: end,
+      dateStart: bounds.start,
+      dateEnd: bounds.end,
     };
     if (budget.categoryId) filter.categoryId = budget.categoryId;
     if (budget.accountId) filter.accountId = budget.accountId;
@@ -97,19 +101,47 @@ export class FinanceBudgetService {
 
     const transactions = await queryTransactions(filter);
     const expenses = transactions.filter(t => t.type === 'expense');
-
     const spent = expenses.reduce((sum, t) => sum + t.amount, 0);
-    const remaining = Math.max(0, budget.target - spent);
-    const percentage = budget.target > 0 ? (spent / budget.target) * 100 : 0;
 
-    // Simple projected spend: extrapolate based on days elapsed
-    const today = new Date();
-    const periodStart = new Date(start);
-    const periodEnd = new Date(end);
-    const totalDays = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / 86400000));
-    const elapsedDays = Math.max(1, Math.ceil((today.getTime() - periodStart.getTime()) / 86400000));
-    const dailyRate = spent / elapsedDays;
-    const projectedSpend = elapsedDays < totalDays ? dailyRate * totalDays : spent;
+    // Calculate rollover if enabled
+    let rolloverAmount = 0;
+    let effectiveTarget = budget.target;
+
+    if (budget.rollover) {
+      const prevBounds = BudgetPeriodEngine.getPreviousPeriodBounds(
+        budget.period,
+        referenceDate,
+        budget.startDate,
+        budget.endDate
+      );
+
+      const prevFilter: Parameters<typeof queryTransactions>[0] = {
+        dateStart: prevBounds.start,
+        dateEnd: prevBounds.end,
+      };
+      if (budget.categoryId) prevFilter.categoryId = budget.categoryId;
+      if (budget.accountId) prevFilter.accountId = budget.accountId;
+      if (budget.labelId) prevFilter.labelId = budget.labelId;
+
+      const prevTxns = await queryTransactions(prevFilter);
+      const prevExpenses = prevTxns.filter(t => t.type === 'expense');
+      const prevSpent = prevExpenses.reduce((sum, t) => sum + t.amount, 0);
+
+      const rolloverRes = BudgetPeriodEngine.calculateRollover(budget, prevSpent, budget.target);
+      rolloverAmount = rolloverRes.rolloverAmount;
+      effectiveTarget = rolloverRes.effectiveTarget;
+    }
+
+    const remaining = Math.max(0, effectiveTarget - spent);
+    const percentage = effectiveTarget > 0 ? (spent / effectiveTarget) * 100 : 0;
+
+    // Spending forecast
+    const forecast = BudgetPeriodEngine.calculateForecast(
+      spent,
+      bounds.daysElapsed,
+      bounds.daysTotal,
+      effectiveTarget
+    );
 
     // Category name for display
     const categories = await getAllCategories();
@@ -121,7 +153,16 @@ export class FinanceBudgetService {
       spent,
       remaining,
       percentage,
-      projectedSpend,
+      projectedSpend: forecast.projectedSpend,
+      potentialOverspend: forecast.potentialOverspend,
+      daysRemaining: bounds.daysRemaining,
+      daysTotal: bounds.daysTotal,
+      daysElapsed: bounds.daysElapsed,
+      dailyRate: forecast.dailyRate,
+      rolloverAmount,
+      effectiveTarget,
+      periodStart: bounds.start,
+      periodEnd: bounds.end,
       isAlert: percentage >= budget.alertThreshold * 100,
       isOver: percentage >= 100,
     };

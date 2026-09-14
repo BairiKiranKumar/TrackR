@@ -308,7 +308,9 @@ export class FinanceTransactionService {
       if (Math.abs(t.amount - transaction.amount) > 0.01) return false;
       // If payee provided, require payee match (or close match)
       if (transaction.payee && t.payee) {
-        const similarity = transaction.payee.toLowerCase() === t.payee.toLowerCase();
+        const p1 = transaction.payee.toLowerCase().trim();
+        const p2 = t.payee.toLowerCase().trim();
+        const similarity = p1 === p2 || p1.includes(p2) || p2.includes(p1);
         if (!similarity) return false;
       }
       return true;

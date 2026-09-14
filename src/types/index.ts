@@ -227,7 +227,10 @@ export interface SyncOperation {
     | 'fa_planned'
     | 'fa_investment'
     | 'fa_debt'
-    | 'fa_label';
+    | 'fa_label'
+    | 'fa_candidate'
+    | 'fa_automation'
+    | 'fa_automation_history';
   entityId: string;
   operation: SyncOperationType;
   payload?: unknown;
@@ -439,7 +442,7 @@ export type AttentionSeverity = 'urgent' | 'warning' | 'info';
 
 export interface AttentionItem {
   id: string;
-  type: 'overdue_task' | 'budget_warning' | 'planned_payment' | 'goal_deadline' | 'blocked_project' | 'missed_tracker';
+  type: 'overdue_task' | 'budget_warning' | 'planned_payment' | 'goal_deadline' | 'blocked_project' | 'missed_tracker' | 'financial_inbox';
   title: string;
   message: string;
   severity: AttentionSeverity;
@@ -656,3 +659,5 @@ export type {
   RuleCondition,
   RuleAction,
 } from './finance';
+
+export * from './automation';

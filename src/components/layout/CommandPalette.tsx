@@ -15,6 +15,9 @@ import {
   Settings,
   PieChart,
   Wallet,
+  Inbox,
+  Calendar,
+  Layers,
 } from 'lucide-react';
 import { contextGraphService } from '@/lib/services/ContextGraphService';
 import styles from './CommandPalette.module.css';
@@ -92,16 +95,20 @@ export function CommandPalette({ isOpen, onClose, onOpenQuickAdd }: CommandPalet
     return [
       { id: 'nav-today', title: 'Open Today / Overview', alias: ['today', 'home', 'overview'], url: '/today', icon: <Compass size={15} /> },
       { id: 'nav-inbox', title: 'Open Inbox', alias: ['inbox', 'capture'], url: '/inbox', icon: <Compass size={15} /> },
+      { id: 'nav-fin-inbox', title: 'Open Financial Inbox', alias: ['financial inbox', 'inbox', 'review', 'receipts', 'candidates'], url: '/money/inbox', icon: <Inbox size={15} /> },
       { id: 'nav-projects', title: 'Open Projects', alias: ['projects', 'cockpit'], url: '/projects', icon: <Folder size={15} /> },
       { id: 'nav-tasks', title: 'Open Tasks', alias: ['tasks', 'todo'], url: '/tasks', icon: <CheckSquare size={15} /> },
       { id: 'nav-notes', title: 'Open Notes', alias: ['notes', 'docs', 'journal'], url: '/notes', icon: <FileText size={15} /> },
       { id: 'nav-money', title: 'Open Money / Finance', alias: ['money', 'finance', 'expenses'], url: '/money', icon: <DollarSign size={15} /> },
       { id: 'nav-txns', title: 'Open Transactions', alias: ['transactions', 'txns', 'spending'], url: '/money/transactions', icon: <DollarSign size={15} /> },
-      { id: 'nav-budgets', title: 'Open Budgets', alias: ['budgets', 'budget'], url: '/money/budgets', icon: <Wallet size={15} /> },
+      { id: 'nav-accounts', title: 'Open Accounts', alias: ['accounts', 'banks', 'wallets', 'balances'], url: '/money/accounts', icon: <Layers size={15} /> },
+      { id: 'nav-budgets', title: 'Open Budgets', alias: ['budgets', 'budget', 'spending limits'], url: '/money/budgets', icon: <Wallet size={15} /> },
+      { id: 'nav-planning', title: 'Open Planning', alias: ['planning', 'planned payments', 'forecast', 'cashflow'], url: '/money/planning', icon: <Calendar size={15} /> },
       { id: 'nav-reports', title: 'Open Financial Reports', alias: ['reports', 'analytics', 'charts'], url: '/money/reports', icon: <PieChart size={15} /> },
       { id: 'nav-investments', title: 'Open Investments', alias: ['investments', 'portfolio'], url: '/money/investments', icon: <TrendingUp size={15} /> },
       { id: 'nav-track', title: 'Open Track / Goals', alias: ['track', 'goals', 'trackers'], url: '/track', icon: <Star size={15} /> },
       { id: 'nav-settings', title: 'Open Settings', alias: ['settings', 'preferences'], url: '/settings', icon: <Settings size={15} /> },
+      { id: 'nav-automation', title: 'Open Automation Rules', alias: ['automation', 'rules', 'triggers'], url: '/settings?tab=automation', icon: <Settings size={15} /> },
       { id: 'nav-search', title: 'Open Universal Search', alias: ['search', 'find'], url: '/search', icon: <Search size={15} /> },
     ];
   }, []);
@@ -128,6 +135,16 @@ export function CommandPalette({ isOpen, onClose, onOpenQuickAdd }: CommandPalet
           router.push('/money/transactions');
         },
         icon: <DollarSign size={15} />,
+      },
+      {
+        id: 'review-financial-inbox',
+        title: 'Review Financial Inbox',
+        alias: ['review financial inbox', 'financial inbox', 'review candidates', 'pending transactions'],
+        action: () => {
+          onClose();
+          router.push('/money/inbox');
+        },
+        icon: <Inbox size={15} />,
       },
       {
         id: 'create-note',

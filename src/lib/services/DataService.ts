@@ -23,6 +23,8 @@ import {
 import { syncQueueService } from './SyncQueueService';
 import { storageModeService } from './StorageModeService';
 import { observabilityService } from './ObservabilityService';
+import { financialInboxService } from './inbox/FinancialInboxService';
+import { FinancialCandidate } from '@/types/automation';
 import { createSampleProjectDataset } from '@/lib/db/demoData';
 
 // ─── ID generation ─────────────────────────────────────────────────────────
@@ -896,11 +898,21 @@ class DataService {
       projectId?: string;
       goalId?: string;
     }[];
+    inboxCandidates?: FinancialCandidate[];
   }> {
-    const [items, transactions] = await Promise.all([
+    const qLower = query.toLowerCase();
+    const [items, transactions, pendingCandidates] = await Promise.all([
       searchItems(query),
       searchFinanceTransactions(query),
+      financialInboxService.getCandidates({ status: 'pending' }).catch(() => [] as FinancialCandidate[]),
     ]);
+
+    const matchingCandidates = pendingCandidates.filter(c =>
+      (c.payee && c.payee.toLowerCase().includes(qLower)) ||
+      (c.reason && c.reason.toLowerCase().includes(qLower)) ||
+      (c.suggestedCategory && c.suggestedCategory.toLowerCase().includes(qLower))
+    );
+
     return {
       items,
       transactions: transactions.map(t => ({
@@ -914,6 +926,7 @@ class DataService {
         projectId: t.projectId,
         goalId: t.goalId,
       })),
+      inboxCandidates: matchingCandidates,
     };
   }
 
