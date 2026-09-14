@@ -10,14 +10,14 @@
 }
 
 .drawer {
-  background: var(--bg-card, #131317);
-  border-left: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
   width: 100%;
   max-width: 480px;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-xl);
   animation: slideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto;
 }
@@ -27,13 +27,13 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .closeBtn {
   background: transparent;
   border: none;
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -43,8 +43,8 @@
 }
 
 .closeBtn:hover {
-  color: var(--text-primary, #ffffff);
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .body {
@@ -56,8 +56,8 @@
 }
 
 .amountCard {
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -72,17 +72,17 @@
 }
 
 .expense {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .income {
-  color: var(--color-success, #10b981);
+  color: var(--color-success);
 }
 
 .payee {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
 }
 
 .metaGrid {
@@ -102,13 +102,13 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-tertiary);
 }
 
 .metaValue {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
 }
 
 .tags {
@@ -120,19 +120,19 @@
 .tag {
   font-size: 0.75rem;
   padding: 3px 8px;
-  background: rgba(139, 92, 246, 0.12);
-  color: var(--accent-purple-light, #c4b5fd);
+  background: var(--accent-purple-glow);
+  color: var(--accent-purple-light);
   border-radius: 6px;
   font-weight: 500;
 }
 
 .noteBlock {
   padding: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border-left: 3px solid var(--border-default, rgba(255, 255, 255, 0.15));
+  background: var(--bg-surface-elevated);
+  border-left: 3px solid var(--border-default);
   border-radius: 0 8px 8px 0;
   font-size: 0.88rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--text-secondary);
   font-style: italic;
 }
 

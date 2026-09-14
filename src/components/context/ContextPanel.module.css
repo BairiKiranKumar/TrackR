@@ -56,17 +56,17 @@
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 8px;
-  background: var(--accent-purple-glow, rgba(139, 92, 246, 0.15));
-  color: var(--accent-purple-light, #c4b5fd);
-  border: 1px solid var(--accent-purple-dim, rgba(139, 92, 246, 0.3));
+  background: var(--accent-purple-glow);
+  color: var(--accent-purple-light);
+  border: 1px solid var(--accent-purple-dim);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .linkBtn:hover {
-  background: var(--accent-purple-dim, rgba(139, 92, 246, 0.25));
-  color: #ffffff;
-  border-color: var(--accent-purple, #8b5cf6);
+  background: var(--accent-purple-dim);
+  color: var(--text-primary);
+  border-color: var(--accent-purple);
 }
 
 .groups {

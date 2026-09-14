@@ -41,13 +41,13 @@
 }
 
 .modal {
-  background: var(--bg-card, #131317);
-  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.15));
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
   padding: 24px;
   width: 100%;
   max-width: 440px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-xl);
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -63,7 +63,7 @@
 .title {
   font-size: 1.2rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -72,7 +72,7 @@
 .closeBtn {
   background: transparent;
   border: none;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 4px;
   border-radius: 8px;
@@ -82,8 +82,8 @@
 }
 
 .closeBtn:hover {
-  background: var(--bg-elevated, #202028);
-  color: var(--text-primary, #ffffff);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .amountBox {
@@ -91,16 +91,16 @@
   align-items: baseline;
   justify-content: center;
   padding: 16px;
-  background: var(--bg-secondary, #111114);
+  background: var(--bg-surface-elevated);
   border-radius: 14px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-subtle);
   position: relative;
 }
 
 .currency {
   font-size: 1.8rem;
   font-weight: 600;
-  color: var(--color-expense, #ef4444);
+  color: var(--color-expense);
   margin-right: 6px;
 }
 
@@ -109,7 +109,7 @@
   border: none;
   font-size: 2.5rem;
   font-weight: 800;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   width: 180px;
   text-align: left;
   outline: none;
@@ -127,7 +127,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-tertiary);
 }
 
 .pillsRow {
@@ -140,9 +140,9 @@
 .pill {
   padding: 8px 14px;
   border-radius: 10px;
-  background: var(--bg-secondary, #111114);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
-  color: var(--text-secondary, #9e9ead);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -151,37 +151,37 @@
 }
 
 .pill:hover {
-  border-color: var(--accent-border, rgba(99, 102, 241, 0.3));
-  color: var(--text-primary, #f4f4f6);
+  border-color: var(--accent-border);
+  color: var(--text-primary);
 }
 
 .pillActive {
-  background: var(--accent-glow, rgba(99, 102, 241, 0.15));
-  border-color: var(--accent-primary, #6366f1);
-  color: #ffffff;
+  background: var(--accent-subtle);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
   font-weight: 600;
 }
 
 .inputField {
   width: 100%;
   padding: 10px 14px;
-  background: var(--bg-input, #121216);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: 10px;
-  color: var(--text-primary, #f4f4f6);
+  color: var(--text-primary);
   font-size: 0.9rem;
   outline: none;
 }
 
 .inputField:focus {
-  border-color: var(--accent-primary, #6366f1);
+  border-color: var(--accent-primary);
 }
 
 .submitBtn {
   width: 100%;
   padding: 14px;
   border-radius: 12px;
-  background: var(--color-expense, #ef4444);
+  background: var(--color-expense);
   color: #ffffff;
   font-weight: 700;
   font-size: 1rem;

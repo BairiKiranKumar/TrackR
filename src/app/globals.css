@@ -54,15 +54,48 @@
   --color-journal:    #60A5FA;
   --color-habit:      #F97316;
 
-  /* Borders — Hairline 1px borders */
+  /* Context badges & accents */
+  --accent-purple:       #8B5CF6;
+  --accent-purple-glow:  rgba(139, 92, 246, 0.15);
+  --accent-purple-light: #C4B5FD;
+  --accent-purple-dim:   rgba(139, 92, 246, 0.30);
+  --accent-blue:         #38BDF8;
+  --accent-emerald:      #10B981;
+  --accent-orange:       #F97316;
+
+  /* Surface & Base Aliases for universal consistency */
+  --surface-primary:     var(--bg-surface);
+  --surface-secondary:   var(--bg-surface-elevated);
+  --surface-tertiary:    var(--bg-elevated);
+
+  /* Border aliases */
   --border-subtle:   rgba(255, 255, 255, 0.07);
   --border-default:  rgba(255, 255, 255, 0.11);
   --border-strong:   rgba(255, 255, 255, 0.18);
+  --border-base:     var(--border-default);
+  --border-color:    var(--border-default);
+  --border-hover:    var(--border-strong);
+  --border-focus:    var(--accent-primary);
+
+  /* Accent & Action aliases */
+  --primary:             var(--accent-primary);
+  --primary-dark:        var(--accent-hover);
+  --color-accent:        var(--accent-primary);
+
+  /* Status text & semantics */
+  --danger:              var(--color-danger);
+  --success:             var(--color-success);
+  --status-success-text: var(--color-success);
+
+  /* Hover & Active backgrounds */
+  --bg-hover:            var(--bg-card-hover);
+  --bg-active:           var(--bg-elevated);
 
   /* Shadows — Minimal, restrained to elevated components */
   --shadow-sm:   0 1px 2px rgba(0,0,0,0.3);
   --shadow-md:   0 4px 14px rgba(0,0,0,0.45);
   --shadow-lg:   0 10px 30px rgba(0,0,0,0.6);
+  --shadow-xl:   0 20px 48px rgba(0,0,0,0.5);
   --shadow-card: none;
   --shadow-glow: 0 0 16px var(--accent-glow);
 
@@ -112,41 +145,97 @@
 
 /* ─── Light Mode ─────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg-primary:     #F9F9FA;
-  --bg-secondary:   #FFFFFF;
-  --bg-tertiary:    #F1F1F4;
-  --bg-card:        #FFFFFF;
-  --bg-card-hover:  #F5F5F8;
-  --bg-elevated:    #ECECEF;
-  --bg-input:       #F3F3F6;
-  --bg-overlay:     rgba(0, 0, 0, 0.45);
-  --bg-header:      rgba(255, 255, 255, 0.9);
-  --bg-nav-glass:   rgba(255, 255, 255, 0.9);
+  /* Colors — Light mode · Clean, modern, high-contrast, premium */
+  --bg-primary:          #F8FAFC;
+  --bg-base:             #F8FAFC;
+  --bg-secondary:        #FFFFFF;
+  --bg-surface:          #FFFFFF;
+  --bg-tertiary:         #F1F5F9;
+  --bg-card:             #FFFFFF;
+  --bg-card-hover:       #F8FAFC;
+  --bg-elevated:         #F1F5F9;
+  --bg-surface-elevated: #F8FAFC;
+  --bg-input:            #F1F5F9;
+  --bg-overlay:          rgba(15, 23, 42, 0.45);
+  --bg-header:           rgba(255, 255, 255, 0.90);
+  --bg-nav-glass:        rgba(255, 255, 255, 0.90);
+
+  /* Text - Crisp WCAG-compliant hierarchy */
+  --text-primary:        #0F172A;
+  --text-secondary:      #475569;
+  --text-tertiary:       #64748B;
+  --text-muted:          #64748B;
+  --text-inverse:        #FFFFFF;
+
+  /* Brand / Accent */
+  --accent-primary:      #4F46E5;
+  --accent-hover:        #4338CA;
+  --accent-secondary:    #6366F1;
+  --accent-subtle:       rgba(79, 70, 229, 0.08);
+  --accent-glow:         rgba(79, 70, 229, 0.12);
+  --accent-border:       rgba(79, 70, 229, 0.24);
 
   /* Semantic - tailored for crisp readability on light backgrounds */
-  --color-success:  #059669;
-  --color-warning:  #D97706;
-  --color-danger:   #DC2626;
-  --color-info:     #2563EB;
+  --color-success:       #059669;
+  --color-warning:       #D97706;
+  --color-danger:        #DC2626;
+  --color-info:          #2563EB;
 
-  --text-primary:   #18181B;
-  --text-secondary: #52525B;
-  --text-tertiary:  #71717A;
-  --text-inverse:   #FFFFFF;
+  /* Category colors - calibrated for light theme contrast */
+  --color-note:          #2563EB;
+  --color-task:          #059669;
+  --color-tracker:       #7C3AED;
+  --color-project:       #D97706;
+  --color-expense:       #DC2626;
+  --color-income:        #059669;
+  --color-goal:          #D97706;
+  --color-journal:       #2563EB;
+  --color-habit:         #EA580C;
 
-  --accent-primary:   #5558E6;
-  --accent-secondary: #6366F1;
-  --accent-glow:      rgba(99, 102, 241, 0.08);
-  --accent-border:    rgba(99, 102, 241, 0.2);
+  /* Context badges & accents tailored for light background readability */
+  --accent-purple:       #7C3AED;
+  --accent-purple-glow:  rgba(124, 58, 237, 0.10);
+  --accent-purple-light: #6D28D9;
+  --accent-purple-dim:   rgba(124, 58, 237, 0.20);
+  --accent-blue:         #0284C7;
+  --accent-emerald:      #059669;
+  --accent-orange:       #D97706;
 
-  --border-subtle:  rgba(0, 0, 0, 0.05);
-  --border-default: rgba(0, 0, 0, 0.10);
-  --border-strong:  rgba(0, 0, 0, 0.18);
+  /* Surface & Base Aliases for universal consistency */
+  --surface-primary:     var(--bg-surface);
+  --surface-secondary:   var(--bg-surface-elevated);
+  --surface-tertiary:    var(--bg-elevated);
 
-  --shadow-sm:   0 1px 2px rgba(0,0,0,0.06);
-  --shadow-md:   0 4px 14px rgba(0,0,0,0.08);
-  --shadow-lg:   0 10px 28px rgba(0,0,0,0.12);
-  --shadow-card: none;
+  /* Borders — Crisp light mode borders */
+  --border-subtle:       rgba(0, 0, 0, 0.06);
+  --border-default:      rgba(0, 0, 0, 0.10);
+  --border-strong:       rgba(0, 0, 0, 0.18);
+  --border-base:         var(--border-default);
+  --border-color:        var(--border-default);
+  --border-hover:        var(--border-strong);
+  --border-focus:        var(--accent-primary);
+
+  /* Action aliases */
+  --primary:             var(--accent-primary);
+  --primary-dark:        var(--accent-hover);
+  --color-accent:        var(--accent-primary);
+
+  /* Status text & semantics */
+  --danger:              var(--color-danger);
+  --success:             var(--color-success);
+  --status-success-text: var(--color-success);
+
+  /* Hover & Active backgrounds */
+  --bg-hover:            var(--bg-card-hover);
+  --bg-active:           var(--bg-elevated);
+
+  /* Shadows — Soft, deep elevation for light mode */
+  --shadow-sm:           0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md:           0 4px 12px rgba(0, 0, 0, 0.07);
+  --shadow-lg:           0 10px 25px rgba(0, 0, 0, 0.10);
+  --shadow-xl:           0 20px 40px rgba(0, 0, 0, 0.12);
+  --shadow-card:         0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-glow:         0 0 16px var(--accent-glow);
 }
 
 /* ─── Reset & Base ───────────────────────────────────────────────────────── */

@@ -1,6 +1,6 @@
 .container {
-  background: var(--bg-card, #131317);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   padding: 20px;
   display: flex;
@@ -17,15 +17,15 @@
 .title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--text-primary, #f4f4f6);
+  color: var(--text-primary);
 }
 
 .currentBalanceChip {
   font-size: 0.85rem;
   padding: 4px 10px;
-  background: var(--bg-elevated, #202028);
+  background: var(--bg-surface-elevated);
   border-radius: 8px;
-  color: var(--text-secondary, #9e9ead);
+  color: var(--text-secondary);
 }
 
 .timeline {
@@ -40,8 +40,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 14px;
-  background: var(--bg-secondary, #111114);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
 }
 
@@ -54,12 +54,12 @@
 .itemTitle {
   font-size: 0.92rem;
   font-weight: 600;
-  color: var(--text-primary, #f4f4f6);
+  color: var(--text-primary);
 }
 
 .itemDate {
   font-size: 0.78rem;
-  color: var(--text-tertiary, #636375);
+  color: var(--text-tertiary);
 }
 
 .itemValues {
@@ -72,17 +72,17 @@
 .itemAmount {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .projectedBalance {
   font-size: 0.78rem;
-  color: var(--text-tertiary, #636375);
+  color: var(--text-tertiary);
 }
 
 .empty {
   padding: 24px 0;
   text-align: center;
-  color: var(--text-tertiary, #636375);
+  color: var(--text-tertiary);
   font-size: 0.88rem;
 }

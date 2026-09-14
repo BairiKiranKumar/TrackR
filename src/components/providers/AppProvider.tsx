@@ -45,7 +45,15 @@ export function useAppContext() {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('trackr_theme');
+        if (saved === 'light' || saved === 'dark') return saved;
+      } catch {}
+    }
+    return 'dark';
+  });
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
@@ -64,6 +72,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (savedTheme) {
           setTheme(savedTheme);
           document.documentElement.setAttribute('data-theme', savedTheme);
+          try {
+            localStorage.setItem('trackr_theme', savedTheme);
+          } catch {}
         }
 
         // Load all items
@@ -145,6 +156,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
     document.documentElement.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem('trackr_theme', next);
+    } catch {}
     await dataService.setSetting('theme', next);
   }, [theme]);
 

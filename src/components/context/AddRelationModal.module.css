@@ -12,8 +12,8 @@
 }
 
 .modal {
-  background: var(--bg-card, #131317);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
   width: 100%;
   max-width: 580px;
@@ -21,7 +21,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-xl);
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -30,20 +30,20 @@
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .headerTitle {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .closeBtn {
   background: transparent;
   border: none;
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -53,8 +53,8 @@
 }
 
 .closeBtn:hover {
-  color: var(--text-primary, #ffffff);
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .body {
@@ -74,26 +74,26 @@
 .searchIcon {
   position: absolute;
   left: 14px;
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-tertiary);
   pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
   padding: 12px 14px 12px 42px;
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   font-size: 0.95rem;
   outline: none;
   transition: all 0.15s ease;
 }
 
 .searchInput:focus {
-  border-color: var(--accent-purple, #8b5cf6);
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.07));
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+  border-color: var(--accent-purple);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 3px var(--accent-purple-glow);
 }
 
 .tabs {
@@ -110,22 +110,22 @@
   font-size: 0.8rem;
   font-weight: 600;
   border: 1px solid transparent;
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.04));
-  color: var(--text-secondary, #a1a1aa);
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
 }
 
 .tabBtn:hover {
-  color: var(--text-primary, #ffffff);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .activeTab {
-  background: var(--accent-purple-glow, rgba(139, 92, 246, 0.2));
-  color: var(--accent-purple-light, #c4b5fd);
-  border-color: var(--accent-purple-dim, rgba(139, 92, 246, 0.4));
+  background: var(--accent-purple-glow);
+  color: var(--accent-purple-light);
+  border-color: var(--accent-purple-dim);
 }
 
 .candidatesList {
@@ -141,21 +141,21 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.05));
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .candidateRow:hover {
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.07));
-  border-color: var(--border-default, rgba(255, 255, 255, 0.15));
+  background: var(--bg-hover);
+  border-color: var(--border-default);
 }
 
 .selectedCandidate {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: var(--accent-purple, #8b5cf6);
+  background: var(--accent-purple-glow);
+  border-color: var(--accent-purple);
 }
 
 .candidateInfo {
@@ -168,7 +168,7 @@
 .candidateTitle {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -176,7 +176,7 @@
 
 .candidateMeta {
   font-size: 0.75rem;
-  color: var(--text-tertiary, #71717a);
+  color: var(--text-tertiary);
 }
 
 .configStep {
@@ -184,8 +184,8 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px;
-  background: var(--bg-card-hover, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
 }
 
@@ -194,16 +194,16 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--text-secondary);
 }
 
 .relSelect {
   width: 100%;
   padding: 10px 12px;
-  background: var(--bg-card, #18181b);
-  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.12));
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
-  color: var(--text-primary, #ffffff);
+  color: var(--text-primary);
   font-size: 0.9rem;
   outline: none;
 }
@@ -213,7 +213,7 @@
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
   font-size: 0.82rem;
 }
 
