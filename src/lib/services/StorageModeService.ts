@@ -36,6 +36,10 @@ class StorageModeService {
     this.currentUserId = userId;
   }
 
+  getActiveUserId(): string | null {
+    return this.currentUserId;
+  }
+
   /** Called by AuthProvider (and the BYODB setup flow) once it knows whether custom Supabase config exists. */
   setCustomConfigured(configured: boolean): void {
     this.customConfigured = configured;

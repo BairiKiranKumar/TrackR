@@ -8,6 +8,7 @@ import {
   Edit2,
   Sparkles,
   Check,
+  Mail,
 } from 'lucide-react';
 import {
   FinancialCandidate,
@@ -152,6 +153,7 @@ export function FinancialInboxReview({
                   <span className={styles.payee}>{cand.payee}</span>
                   <span className={styles.metaBadge}>
                     {cand.source === 'csv' ? <FileSpreadsheet size={12} /> : null}
+                    {cand.source === 'gmail' ? <Mail size={12} /> : null}
                     {cand.source}
                   </span>
                 </div>
@@ -167,6 +169,14 @@ export function FinancialInboxReview({
                   )}
                   {cand.reason && <span className={styles.reasonText}>({cand.reason})</span>}
                 </div>
+
+                {/* Gmail review disclaimer */}
+                {cand.source === 'gmail' && (
+                  <div className={styles.gmailBanner}>
+                    <Mail size={12} className={styles.gmailIcon} />
+                    <span>Detected from Gmail · TRACKR has not created a transaction yet. Review and accept below.</span>
+                  </div>
+                )}
 
                 {/* Duplicate diff banner if detected */}
                 {cand.duplicateOf && (

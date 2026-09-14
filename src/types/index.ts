@@ -250,7 +250,15 @@ export type DiagnosticCategory =
   | 'import_failure'
   | 'export_failure'
   | 'integration_failure'
-  | 'conflict_detected';
+  | 'conflict_detected'
+  | 'gmail_connect_started'
+  | 'gmail_connect_success'
+  | 'gmail_sync_started'
+  | 'gmail_sync_completed'
+  | 'gmail_sync_failed'
+  | 'gmail_candidate_created'
+  | 'gmail_duplicate_skipped'
+  | 'gmail_disconnected';
 
 export interface DiagnosticEvent {
   id: string;

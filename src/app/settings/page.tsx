@@ -6,7 +6,7 @@ import {
   Moon, Sun, Cloud, RefreshCw,
   Download, Upload, ChevronRight, LogOut, Trash2,
   Package, CheckCircle2, AlertCircle, Settings2,
-  Lock, Zap, Plug, Sliders,
+  Lock, Zap, Plug, Sliders, Mail, Link2, Unlink,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -14,6 +14,8 @@ import { useConfirm } from '@/components/providers/ConfirmDialogProvider';
 import { useToast } from '@/components/providers/ToastProvider';
 import { dataService } from '@/lib/services/DataService';
 import { storageModeService } from '@/lib/services/StorageModeService';
+import { gmailAuthService } from '@/lib/services/integrations/gmail/GmailAuthService';
+import { gmailAdapter } from '@/lib/services/integrations/gmail/GmailAdapter';
 import { StorageMode } from '@/types';
 import { Button, Badge } from '@/components/ui';
 import { AutomationSettings } from '@/components/settings/AutomationSettings';
@@ -45,6 +47,10 @@ export default function SettingsPage() {
     return 'general';
   });
 
+  // ── Gmail Integration State ──────────────────────────────────────────
+  const [gmailState, setGmailState] = useState(() => gmailAuthService.getConnectionState());
+  const [isGmailSyncing, setIsGmailSyncing] = useState(false);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -55,9 +61,69 @@ export default function SettingsPage() {
       if (!active) return;
       setStorageMode(mode);
       setNeedsMigrationChoice(needsChoice);
+      // Check for Google OAuth callback tokens in URL hash
+      if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+        const res = gmailAuthService.handleOAuthCallback(window.location.hash);
+        if (res.success) {
+          if (active) setGmailState(gmailAuthService.getConnectionState());
+          showToast('Gmail connected successfully!', 'success');
+          window.history.replaceState(null, '', window.location.pathname);
+        } else {
+          showToast(`Gmail connection failed: ${res.error}`, 'error');
+        }
+      }
     })();
+
     return () => { active = false; };
-  }, [userConfig]);
+  }, [userConfig, showToast]);
+
+  async function handleConnectGmail() {
+    // If client ID is unset (e.g. development/testing), use deterministic simulation
+    if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+      gmailAuthService.simulateConnect(user?.email || 'user.beta@gmail.com');
+      setGmailState(gmailAuthService.getConnectionState());
+      showToast('Connected to Gmail (Simulation Mode). Ready to sync receipts!', 'success');
+      return;
+    }
+    const { authUrl } = gmailAuthService.initiateOAuthFlow();
+    window.location.href = authUrl;
+  }
+
+  async function handleSyncGmail() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showToast('Network offline. Gmail sync requires an internet connection.', 'error');
+      return;
+    }
+
+    setIsGmailSyncing(true);
+    try {
+      const res = await gmailAdapter.sync();
+      setGmailState(gmailAuthService.getConnectionState());
+      if (res.success) {
+        showToast(`Gmail sync complete: ${res.candidatesFound} new candidates, ${res.duplicatesSkipped} duplicates skipped.`, 'success');
+      } else {
+        showToast(res.error || 'Gmail sync failed.', 'error');
+      }
+    } catch {
+      showToast('Gmail sync failed unexpectedly.', 'error');
+    } finally {
+      setIsGmailSyncing(false);
+    }
+  }
+
+  async function handleDisconnectGmail() {
+    const confirmed = await confirm({
+      title: 'Disconnect Gmail?',
+      message: 'This will stop syncing receipts and invoices from Gmail. Existing accepted transactions and pending review candidates will not be deleted.',
+      confirmLabel: 'Disconnect',
+      danger: false,
+    });
+    if (!confirmed) return;
+
+    await gmailAuthService.disconnect();
+    setGmailState(gmailAuthService.getConnectionState());
+    showToast('Gmail disconnected.', 'info');
+  }
 
   async function resolveMigrationChoice(target: StorageMode) {
     await storageModeService.setMode(target);
@@ -418,7 +484,69 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 4. Sync & Status */}
+        {/* 4. Connections & Integrations */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Connections</h2>
+          <div className={styles.panel}>
+            <div className={styles.settingRow}>
+              <div className={styles.settingInfo}>
+                <Mail size={16} className={styles.settingIcon} />
+                <div>
+                  <span className={styles.settingLabel}>Gmail</span>
+                  <span className={styles.settingSubtitle}>
+                    {gmailState.connected
+                      ? `Connected as ${gmailState.email || 'Google Account'} · Last synced: ${gmailState.lastSyncAt ? new Date(gmailState.lastSyncAt).toLocaleTimeString() : 'Never'}`
+                      : 'Connect Gmail to detect receipts, invoices, and payments directly into Financial Inbox'}
+                  </span>
+                </div>
+              </div>
+              <div className={styles.settingActions}>
+                {gmailState.connected ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleSyncGmail}
+                      disabled={isGmailSyncing}
+                      id="btn-sync-gmail"
+                    >
+                      <RefreshCw size={13} className={isGmailSyncing ? styles.spinIcon : ''} />
+                      <span>{isGmailSyncing ? 'Syncing…' : 'Sync now'}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDisconnectGmail}
+                      id="btn-disconnect-gmail"
+                    >
+                      <Unlink size={13} />
+                      <span>Disconnect</span>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleConnectGmail}
+                    id="btn-connect-gmail"
+                  >
+                    <Link2 size={13} />
+                    <span>Connect Gmail</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            {gmailState.connected && gmailState.stats && (
+              <div className={styles.metaRow}>
+                <span>Messages checked: {gmailState.stats.messagesChecked}</span>
+                <span>· Candidates found: {gmailState.stats.candidatesFound}</span>
+                <span>· Duplicates skipped: {gmailState.stats.duplicatesSkipped}</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 5. Sync & Status */}
         <section className={styles.section}>
           <h2 className={styles.sectionHeading}>Sync</h2>
           <div className={styles.panel}>

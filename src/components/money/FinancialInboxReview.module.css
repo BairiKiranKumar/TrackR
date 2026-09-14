@@ -118,15 +118,33 @@
   align-items: center;
   gap: 4px;
   background: rgba(99, 102, 241, 0.1);
-  color: var(--accent-primary, #6366f1);
-  padding: 1px 6px;
-  border-radius: var(--radius-xs);
+  color: var(--color-accent);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
   font-weight: 500;
 }
 
 .reasonText {
-  color: var(--text-tertiary, #94a3b8);
+  color: var(--text-muted);
   font-style: italic;
+}
+
+.gmailBanner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: rgba(234, 67, 53, 0.08);
+  border: 1px solid rgba(234, 67, 53, 0.2);
+  border-radius: var(--radius-xs);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.gmailIcon {
+  color: #ea4335;
+  flex-shrink: 0;
 }
 
 /* Duplicate Diff Banner */

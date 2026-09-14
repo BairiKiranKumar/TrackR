@@ -49,8 +49,8 @@ export interface FinanceTransaction {
   labels: string[];         // label ids
   projectId?: string;       // link to Universal Item project
   goalId?: string;          // link to Universal Item goal
-  source?: 'manual' | 'csv_import' | 'recurring' | 'financial_inbox';
-  sourceReference?: string; // e.g. CSV filename, recurringId
+  source?: 'manual' | 'csv_import' | 'recurring' | 'financial_inbox' | 'gmail';
+  sourceReference?: string; // e.g. CSV filename, recurringId, gmail:<messageId>
   recurringId?: string;     // link to FinancePlannedPayment
   transferId?: string;      // pairs two transfer transactions
   ruleExecutions: RuleExecution[];

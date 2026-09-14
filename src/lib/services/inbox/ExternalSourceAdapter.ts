@@ -76,14 +76,13 @@ export class CsvSourceAdapter implements ExternalSourceAdapter<{ rows: CsvImport
   }
 }
 
-/** Stubbed boundaries ready for future external connectors (Phase 6+) */
-export class FutureGmailAdapter implements ExternalSourceAdapter {
-  source: FinancialCandidateSource = 'gmail';
-  async detect(): Promise<CandidateDraft[]> {
-    // External Gmail connections deferred to future phases
-    return [];
-  }
-}
+import { GmailAdapter, gmailAdapter, type GmailSyncOptions } from '@/lib/services/integrations/gmail/GmailAdapter';
+
+export { GmailAdapter, gmailAdapter };
+export type { GmailSyncOptions };
+
+/** Gmail Adapter implementing ExternalSourceAdapter */
+export class FutureGmailAdapter extends GmailAdapter {}
 
 export class FutureBankAdapter implements ExternalSourceAdapter {
   source: FinancialCandidateSource = 'bank';

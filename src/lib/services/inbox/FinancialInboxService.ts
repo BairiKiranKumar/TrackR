@@ -79,13 +79,13 @@ export class FinancialInboxService {
 
     if (sim.matchedRules.length > 0) {
       const topMatch = sim.matchedRules[0];
-      if (sim.preview.categoryId && !suggestedCategory) {
+      if (sim.preview.categoryId) {
         suggestedCategory = String(sim.preview.categoryId);
       }
-      if (sim.preview.projectId && !suggestedProject) {
+      if (sim.preview.projectId) {
         suggestedProject = String(sim.preview.projectId);
       }
-      if (sim.preview.goalId && !suggestedGoal) {
+      if (sim.preview.goalId) {
         suggestedGoal = String(sim.preview.goalId);
       }
       if (Array.isArray(sim.preview.labels) && sim.preview.labels.length > 0) {
@@ -190,8 +190,8 @@ export class FinancialInboxService {
       projectId: overrides?.projectId ?? candidate.suggestedProject,
       goalId: overrides?.goalId ?? candidate.suggestedGoal,
       labels: overrides?.labels ?? candidate.suggestedLabels ?? [],
-      source: 'financial_inbox',
-      sourceReference: candidate.id,
+      source: candidate.source === 'gmail' ? 'gmail' : 'financial_inbox',
+      sourceReference: candidate.sourceReference || candidate.id,
     });
 
     const updatedCandidate: FinancialCandidate = {
