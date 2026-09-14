@@ -190,7 +190,7 @@ export class FinancialInboxService {
       projectId: overrides?.projectId ?? candidate.suggestedProject,
       goalId: overrides?.goalId ?? candidate.suggestedGoal,
       labels: overrides?.labels ?? candidate.suggestedLabels ?? [],
-      source: candidate.source === 'gmail' ? 'gmail' : 'financial_inbox',
+      source: candidate.source === 'gmail' ? 'gmail' : candidate.source === 'bank' ? 'bank' : 'financial_inbox',
       sourceReference: candidate.sourceReference || candidate.id,
     });
 

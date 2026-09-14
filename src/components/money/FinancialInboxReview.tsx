@@ -9,6 +9,7 @@ import {
   Sparkles,
   Check,
   Mail,
+  Building2,
 } from 'lucide-react';
 import {
   FinancialCandidate,
@@ -154,6 +155,7 @@ export function FinancialInboxReview({
                   <span className={styles.metaBadge}>
                     {cand.source === 'csv' ? <FileSpreadsheet size={12} /> : null}
                     {cand.source === 'gmail' ? <Mail size={12} /> : null}
+                    {cand.source === 'bank' ? <Building2 size={12} /> : null}
                     {cand.source}
                   </span>
                 </div>
@@ -175,6 +177,14 @@ export function FinancialInboxReview({
                   <div className={styles.gmailBanner}>
                     <Mail size={12} className={styles.gmailIcon} />
                     <span>Detected from Gmail · TRACKR has not created a transaction yet. Review and accept below.</span>
+                  </div>
+                )}
+
+                {/* Bank review disclaimer */}
+                {cand.source === 'bank' && (
+                  <div className={styles.gmailBanner}>
+                    <Building2 size={12} className={styles.gmailIcon} />
+                    <span>Detected from Bank Account · TRACKR has not created a transaction yet. Review and accept below.</span>
                   </div>
                 )}
 

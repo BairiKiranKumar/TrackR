@@ -49,8 +49,8 @@ export interface FinanceTransaction {
   labels: string[];         // label ids
   projectId?: string;       // link to Universal Item project
   goalId?: string;          // link to Universal Item goal
-  source?: 'manual' | 'csv_import' | 'recurring' | 'financial_inbox' | 'gmail';
-  sourceReference?: string; // e.g. CSV filename, recurringId, gmail:<messageId>
+  source?: 'manual' | 'csv_import' | 'recurring' | 'financial_inbox' | 'gmail' | 'bank';
+  sourceReference?: string; // e.g. CSV filename, recurringId, gmail:<messageId>, bank:<accountMask>:<txnId>
   recurringId?: string;     // link to FinancePlannedPayment
   transferId?: string;      // pairs two transfer transactions
   ruleExecutions: RuleExecution[];
@@ -622,3 +622,70 @@ export interface FinancialCandidate {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── ReBIT Account Aggregator & Bank Types (Phase 7) ─────────────────────────
+
+export type RebitTransactionMode =
+  | 'UPI'
+  | 'NEFT'
+  | 'IMPS'
+  | 'RTGS'
+  | 'CARD'
+  | 'ATM'
+  | 'POS'
+  | 'OTHERS';
+
+export type RebitTransactionType = 'DEBIT' | 'CREDIT';
+
+export interface RebitDepositTransaction {
+  txnId: string;                     // Bank unique transaction reference
+  type: RebitTransactionType;        // DEBIT | CREDIT
+  mode: RebitTransactionMode;
+  amount: number;                    // Positive numeric amount
+  currentBalance?: number;           // Balance after txn
+  transactionTimestamp: string;      // ISO 8601 string e.g. 2026-09-12T14:22:10Z
+  valueDate: string;                 // Settlement date YYYY-MM-DD
+  narration: string;                 // Raw bank narration
+  reference?: string;                // UTR or reference number
+}
+
+export interface RebitDepositAccount {
+  accountType: 'SAVINGS' | 'CURRENT';
+  maskedAccNumber: string;           // e.g. "XXXXXXXX4012"
+  currentBalance: number;
+  currency: string;                  // default "INR"
+  branch?: string;
+  ifsc?: string;
+  fipId?: string;                    // Bank identifier (e.g. "SBI-FIP", "HDFC-FIP")
+  fipName?: string;                  // Display name e.g. "State Bank of India"
+  transactions: RebitDepositTransaction[];
+}
+
+export interface RebitDepositPayload {
+  accounts: RebitDepositAccount[];
+}
+
+export type SetuConsentStatus = 'PENDING' | 'ACTIVE' | 'REJECTED' | 'REVOKED' | 'EXPIRED';
+
+export interface SetuConsentArtefact {
+  id: string;
+  status: SetuConsentStatus;
+  accountMasks: string[];
+  fipId: string;
+  fipName: string;
+  validFrom: string;
+  validUntil: string;
+  createdAt: string;
+}
+
+export interface BankConnectionConfig {
+  connected: boolean;
+  consentId?: string;
+  fipId?: string;
+  fipName?: string;
+  accountMask?: string;
+  lastSyncAt?: string;
+  consentStatus?: SetuConsentStatus;
+  validUntil?: string;
+}
+

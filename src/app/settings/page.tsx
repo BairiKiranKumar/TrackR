@@ -6,7 +6,7 @@ import {
   Moon, Sun, Cloud, RefreshCw,
   Download, Upload, ChevronRight, LogOut, Trash2,
   Package, CheckCircle2, AlertCircle, Settings2,
-  Lock, Zap, Plug, Sliders, Mail, Link2, Unlink,
+  Lock, Zap, Plug, Sliders, Mail, Link2, Unlink, Building2,
 } from 'lucide-react';
 import { useAppContext } from '@/components/providers/AppProvider';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -16,6 +16,8 @@ import { dataService } from '@/lib/services/DataService';
 import { storageModeService } from '@/lib/services/StorageModeService';
 import { gmailAuthService } from '@/lib/services/integrations/gmail/GmailAuthService';
 import { gmailAdapter } from '@/lib/services/integrations/gmail/GmailAdapter';
+import { setuBankAuthService } from '@/lib/services/integrations/bank/SetuBankAuthService';
+import { bankAdapter } from '@/lib/services/integrations/bank/BankAdapter';
 import { StorageMode } from '@/types';
 import { Button, Badge } from '@/components/ui';
 import { AutomationSettings } from '@/components/settings/AutomationSettings';
@@ -123,6 +125,55 @@ export default function SettingsPage() {
     await gmailAuthService.disconnect();
     setGmailState(gmailAuthService.getConnectionState());
     showToast('Gmail disconnected.', 'info');
+  }
+
+  // ── Bank Integration State (Account Aggregator) ──────────────────────
+  const [bankState, setBankState] = useState(() => setuBankAuthService.getConnectionState());
+  const [isBankSyncing, setIsBankSyncing] = useState(false);
+
+  async function handleConnectBank() {
+    setuBankAuthService.simulateConnect({
+      fipName: 'State Bank of India',
+      accountMask: 'XXXXXXXX4012',
+    });
+    setBankState(setuBankAuthService.getConnectionState());
+    showToast('Connected to State Bank of India via Setu AA (Simulation Mode). Ready to sync!', 'success');
+  }
+
+  async function handleSyncBank() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      showToast('Network offline. Bank sync requires an internet connection.', 'error');
+      return;
+    }
+
+    setIsBankSyncing(true);
+    try {
+      const res = await bankAdapter.sync();
+      setBankState(setuBankAuthService.getConnectionState());
+      if (res.success) {
+        showToast(`Bank sync complete: ${res.candidatesFound} new candidates, ${res.duplicatesSkipped} duplicates skipped.`, 'success');
+      } else {
+        showToast(res.error || 'Bank sync failed.', 'error');
+      }
+    } catch {
+      showToast('Bank sync failed unexpectedly.', 'error');
+    } finally {
+      setIsBankSyncing(false);
+    }
+  }
+
+  async function handleDisconnectBank() {
+    const confirmed = await confirm({
+      title: 'Disconnect Bank Account?',
+      message: 'This will revoke consent with Setu Account Aggregator. Existing accepted transactions and pending review candidates will not be deleted.',
+      confirmLabel: 'Disconnect',
+      danger: false,
+    });
+    if (!confirmed) return;
+
+    await setuBankAuthService.disconnect();
+    setBankState(setuBankAuthService.getConnectionState());
+    showToast('Bank account disconnected.', 'info');
   }
 
   async function resolveMigrationChoice(target: StorageMode) {
@@ -541,6 +592,64 @@ export default function SettingsPage() {
                 <span>Messages checked: {gmailState.stats.messagesChecked}</span>
                 <span>· Candidates found: {gmailState.stats.candidatesFound}</span>
                 <span>· Duplicates skipped: {gmailState.stats.duplicatesSkipped}</span>
+              </div>
+            )}
+
+            {/* Indian Bank Accounts (Account Aggregator) */}
+            <div className={styles.divider} />
+            <div className={styles.settingRow}>
+              <div className={styles.settingInfo}>
+                <Building2 size={16} className={styles.settingIcon} />
+                <div>
+                  <span className={styles.settingLabel}>Indian Bank Accounts (Account Aggregator)</span>
+                  <span className={styles.settingSubtitle}>
+                    {bankState.connected
+                      ? `Connected via Setu AA (${bankState.fipName || 'State Bank of India'} ···${bankState.accountMask?.slice(-4) || '4012'}) · Last synced: ${bankState.lastSyncAt ? new Date(bankState.lastSyncAt).toLocaleTimeString() : 'Never'}`
+                      : 'Connect your Indian bank account via RBI Account Aggregator to import UPI, POS, and statement transactions'}
+                  </span>
+                </div>
+              </div>
+              <div className={styles.settingActions}>
+                {bankState.connected ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleSyncBank}
+                      disabled={isBankSyncing}
+                      id="btn-sync-bank"
+                    >
+                      <RefreshCw size={13} className={isBankSyncing ? styles.spinIcon : ''} />
+                      <span>{isBankSyncing ? 'Syncing…' : 'Sync now'}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDisconnectBank}
+                      id="btn-disconnect-bank"
+                    >
+                      <Unlink size={13} />
+                      <span>Disconnect</span>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleConnectBank}
+                    id="btn-connect-bank"
+                  >
+                    <Link2 size={13} />
+                    <span>Connect Bank</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            {bankState.connected && bankState.stats && (
+              <div className={styles.metaRow}>
+                <span>Transactions checked: {bankState.stats.transactionsChecked}</span>
+                <span>· Candidates found: {bankState.stats.candidatesFound}</span>
+                <span>· Duplicates skipped: {bankState.stats.duplicatesSkipped}</span>
               </div>
             )}
           </div>

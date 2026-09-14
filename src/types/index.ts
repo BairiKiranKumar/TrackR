@@ -258,7 +258,15 @@ export type DiagnosticCategory =
   | 'gmail_sync_failed'
   | 'gmail_candidate_created'
   | 'gmail_duplicate_skipped'
-  | 'gmail_disconnected';
+  | 'gmail_disconnected'
+  | 'bank_connect_started'
+  | 'bank_connect_success'
+  | 'bank_sync_started'
+  | 'bank_sync_completed'
+  | 'bank_sync_failed'
+  | 'bank_candidate_created'
+  | 'bank_duplicate_skipped'
+  | 'bank_disconnected';
 
 export interface DiagnosticEvent {
   id: string;

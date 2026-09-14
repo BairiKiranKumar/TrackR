@@ -77,17 +77,14 @@ export class CsvSourceAdapter implements ExternalSourceAdapter<{ rows: CsvImport
 }
 
 import { GmailAdapter, gmailAdapter, type GmailSyncOptions } from '@/lib/services/integrations/gmail/GmailAdapter';
+import { BankAdapter, bankAdapter, type BankSyncOptions } from '@/lib/services/integrations/bank/BankAdapter';
 
-export { GmailAdapter, gmailAdapter };
-export type { GmailSyncOptions };
+export { GmailAdapter, gmailAdapter, BankAdapter, bankAdapter };
+export type { GmailSyncOptions, BankSyncOptions };
 
 /** Gmail Adapter implementing ExternalSourceAdapter */
 export class FutureGmailAdapter extends GmailAdapter {}
 
-export class FutureBankAdapter implements ExternalSourceAdapter {
-  source: FinancialCandidateSource = 'bank';
-  async detect(): Promise<CandidateDraft[]> {
-    // Bank aggregation deferred to future phases
-    return [];
-  }
-}
+/** Bank Adapter implementing ExternalSourceAdapter */
+export class FutureBankAdapter extends BankAdapter {}
+
